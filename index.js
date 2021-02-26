@@ -1,13 +1,21 @@
-var Github = require("github-api");
+// Require express and body-parser
+const express = require("express")
+const bodyParser = require("body-parser")
 
-var gh = new Github({
-    "token": '4ce17ef1a2653e17d1646de9724741ef8dd7424e'
+// Initialize express and define a port
+const app = express()
+const PORT = 433
+
+// Tell express to use body-parser's JSON parsing
+app.use(bodyParser.json())
+
+app.post("/hook", (req, res) => {
+  console.log(req.body) // Call your action on the request here
+  res.status(200).end() // Responding is important
 })
 
-var repo = gh.getRepo("epstechtheatre", "epstechtheatre.github.io")
+//...
 
-debugger
 
-repo.getPullRequests().then((pr) => {
-    debugger
-})
+// Start express on the defined port
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`))
