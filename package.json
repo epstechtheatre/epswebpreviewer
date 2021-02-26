@@ -1,0 +1,22 @@
+{
+  "name": "epswebpreviewer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/epstechtheatre/epswebpreviewer.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/epstechtheatre/epswebpreviewer/issues"
+  },
+  "homepage": "https://github.com/epstechtheatre/epswebpreviewer#readme",
+  "dependencies": {
+    "github-api": "^3.4.0"
+  }
+}
