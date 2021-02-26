@@ -1,0 +1,18 @@
+1) Register Webhook with Github that listens for pull request updates
+
+2) On a new pull request:
+    - Download the pull request branch
+    - Load it into a directory
+    - Run the Jekyll builder on it and run it on a server
+        - Host/<prnumber>/...
+
+    - Comment on the PR with a link to the preview
+
+3) On a update to a pull request:
+    - Kill any existing jekyll site running for the pr
+    - Delete the existing directory
+    - Repeat 2 from bullet 3
+
+4) On a closed PR
+     - Kill
+     - Delete
