@@ -116,8 +116,6 @@ class PRInstance {
         return this
     }
 
-    
-
     async download() {
         this.processQueue.AddProcess(callback)
 
@@ -166,12 +164,12 @@ class PRInstance {
             return new Promise(async function (resolve, reject) {
                 Me.killJekyll()
                 await Me.#deleteDir()
-                resolve()
-
                 //We don't want to remove this because if the PR gets immediately reopened, we should keep track of the process queue. Next time the script restarts, it will be released
                 if (forceRelease) {
                     delete PRInstance.instances[Me.options.PRID]
                 }
+
+                resolve()
             })
         }
     }
