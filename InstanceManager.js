@@ -132,7 +132,7 @@ class PRInstance {
             //Set a 6 hour timeout, after this time, close the Jekyll process
             this.assignedPort = this.#PRidToInt() + config.Starting_Port
 
-            this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`], {
+            this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`, `--no-watch`], {
                 cwd: `site_instances/${this.options.PRID}/docs`,
             })
             this.process.stdout.on("data", data => {
@@ -173,7 +173,6 @@ class PRInstance {
 
     killJekyll() {
         if (this.process) {
-            this.process?.stdout.off("data")
             this.process?.kill()
             console.log(`Disabled Jekyll for PR ${this.options.PRID}!`)
         }
