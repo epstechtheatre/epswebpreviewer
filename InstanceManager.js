@@ -13,6 +13,7 @@ var gh = new Github({
 
 class ProcessQueue extends Array {
     constructor(Parent) {
+        super();
         this.parent = Parent
         this.running = false
     } 
@@ -126,11 +127,13 @@ class PRInstance {
                 //Check if already exists, if so, stop this and swap to edit
                 if (Me.#dirExists()) {
                     await Me.edit()
+                    resolve()
     
                 } else {
                     await Me.#downloadDir()
                     if (Me.activateJekyll()) {
                         await Me.comment()
+                        resolve()
                     }
                 }
             })
@@ -149,12 +152,13 @@ class PRInstance {
                 await Me.#downloadDir()
                 if (Me.activateJekyll()) {
                     await Me.comment("edit")
+                    resolve()
                 }
             })
         }
     }
 
-    async remove() {
+    async remove(forceRelease = false) {
         this.processQueue.AddProcess(callback)
 
         let Me = this
@@ -162,7 +166,12 @@ class PRInstance {
             return new Promise(async function (resolve, reject) {
                 Me.killJekyll()
                 await Me.#deleteDir()
-                delete PRInstance.instances[Me.options.PRID]
+                resolve()
+
+                //We don't want to remove this because if the PR gets immediately reopened, we should keep track of the process queue. Next time the script restarts, it will be released
+                if (forceRelease) {
+                    delete PRInstance.instances[Me.options.PRID]
+                }
             })
         }
     }
@@ -234,22 +243,26 @@ class PRInstance {
      * @param {"new"|"edit"} type 
      */
     comment(type = "new") {
-        let comment = ""
-        switch (type) {
-            case "new":
-                comment = `Your proposed changes have been downloaded successfully!
-                [Click Here](http://${config.LinkToDomain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes. 
-                The preview site will remain active for a six hour period following the most recent update. It will close after this time, or when your changes are merged. Whichever happens first.`
-                break;
-
-            case "edit":
-                comment = `Your latest changes have been downloaded successfully! 
-                [Click Here](http://${config.LinkToDomain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes.`
-                break;
-        }
-
-        gh.getIssues(this.options.PRRepoAccount, this.options.PRRepoName).createIssueComment(this.#PRidToInt(), comment, function() {
+        return new Promise(function (resolve, reject) {
+            let comment = ""
+            switch (type) {
+                case "new":
+                    comment = `Your proposed changes have been downloaded successfully!
+                    [Click Here](http://${config.LinkToDomain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes. 
+                    The preview site will remain active for a six hour period following the most recent update. It will close after this time, or when your changes are merged. Whichever happens first.`
+                    break;
+    
+                case "edit":
+                    comment = `Your latest changes have been downloaded successfully! 
+                    [Click Here](http://${config.LinkToDomain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes.`
+                    break;
+            }
+    
+            gh.getIssues(this.options.PRRepoAccount, this.options.PRRepoName).createIssueComment(this.#PRidToInt(), comment, () => {
+                resolve()
+            })
         })
+
     }
 
     killJekyll() {
