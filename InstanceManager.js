@@ -6,7 +6,6 @@ const {spawn} = require("child_process")
 const Github = require("github-api");
 const auth = require("./auth.json")
 const config = require("./config.json");
-const { fn } = require("moment");
 
 var gh = new Github({
     "token": auth.token
