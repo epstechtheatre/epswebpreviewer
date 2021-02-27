@@ -5,7 +5,7 @@ const bodyParser = require("body-parser")
 const InstanceManager = require("./InstanceManager.js")
 
 //const PR_IDLE_WAIT = 15000 //15 seconds, ensures that latest zip is ready before downloading
-const PR_IDLE_WAIT = 15000 //15 seconds, ensures that latest zip is ready before downloading
+const PR_IDLE_WAIT = require("./config.json").PR_IDLE_WAIT //15 seconds, ensures that latest zip is ready before downloading
 
 // Initialize express and define a port
 const app = express()
@@ -36,9 +36,9 @@ function validatePR(reqBody) {
 		if (!["opened", "reopened", "synchronize", "closed"].includes(reqBody.action)) {
 			return;
 		}
-		console.log(`Valid Hook Received! Type: ${reqBody.action} Issue: ${reqBody.number}`)
+		console.log(`Valid Hook Received!\nType: ${reqBody.action} | Issue: ${reqBody.number}`)
 
-		//Is now a valid pull request probably
+		//Is now a valid pull request
 
 		//Lets wait 15 seconds or so before process, just so that zips of the repo are up to date
 		setTimeout(function() {

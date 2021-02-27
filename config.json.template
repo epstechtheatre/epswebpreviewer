@@ -1,0 +1,6 @@
+{
+    "LinkToDomain": "a.b.c.d",
+    "InternalIPOverride": "1.2.3.4",
+    "Starting_Port": 40000,
+    "PR_IDLE_WAIT": 15000
+}
