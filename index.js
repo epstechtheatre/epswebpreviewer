@@ -15,8 +15,6 @@ const PORT = 9193
 app.use(bodyParser.json())
 
 app.post("/hook", (req, res) => {
-
-	console.log(`Hook Received!`)
 	//console.log(req.body) // Call your action on the request here
 	res.status(200).end() // Responding is important
 
@@ -38,6 +36,7 @@ function validatePR(reqBody) {
 		if (!["opened", "reopened", "synchronize", "closed"].includes(reqBody.action)) {
 			return;
 		}
+		console.log(`Valid Hook Received!`)
 
 		//Is now a valid pull request probably
 
