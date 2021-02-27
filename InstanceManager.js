@@ -135,17 +135,16 @@ class PRInstance {
             this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`], {
                 cwd: `site_instances/${this.options.PRID}/docs`,
             })
-            this.process.stdout.on("data", Me.#logChildStdout)
+            this.process.stdout.on("data", data => {
+                console.log(`stdout from PR ${Me.options.PRID} jekyll child: ${data}`)
+
+            })
 
             this.processTimeout = setTimeout(function() {
                 Me.killJekyll()
             }, 1000 * 60 * 60 * 6)
         }
         return true
-    }
-
-    #logChildStdout(data) {
-        console.log(`stdout from PR ${this.options.PRID} jekyll child: ${data}`)
     }
 
     /**
@@ -174,7 +173,7 @@ class PRInstance {
 
     killJekyll() {
         if (this.process) {
-            this.process?.stdout.off("data", this.#logChildStdout)
+            this.process?.stdout.off("data")
             this.process?.kill()
             console.log(`Disabled Jekyll for PR ${this.options.PRID}!`)
         }
