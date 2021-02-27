@@ -176,7 +176,6 @@ class PRInstance {
         }
 
         gh.getIssues(this.options.PRRepoAccount, this.options.PRRepoName).createIssueComment(this.#PRidToInt(), comment, function() {
-            debugger
         })
     }
 
