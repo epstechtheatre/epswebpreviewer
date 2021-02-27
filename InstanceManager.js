@@ -226,8 +226,7 @@ class PRInstance {
 
             console.log(`Activating Jekyll Instance for PR ${this.options.PRID}`)
             this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`, `--no-watch`], {
-                cwd: `site_instances/${this.options.PRID}/docs`,
-                stdio: "inherit"
+                cwd: `site_instances/${this.options.PRID}/docs`
             })
 
             this.process.stdout.on("data", data => {
