@@ -59,13 +59,18 @@ function processPRUpdate(reqBody) {
 		case "opened":
 		case "reopened":
 			//Build
-			new InstanceManager({
-				"Branch": branchName,
-				"SourceRepoFullName": repo,
-				"PRID": PRid,
-				"PRRepoAccount": prRepoAuthor,
-				"PRRepoName": prRepo
-			}).download()
+			try {
+				InstanceManager.GetInstance(PRid).download()
+			} catch (e) {
+				new InstanceManager({
+					"Branch": branchName,
+					"SourceRepoFullName": repo,
+					"PRID": PRid,
+					"PRRepoAccount": prRepoAuthor,
+					"PRRepoName": prRepo
+				}).download()
+			}
+
 			break;
 
 		case "synchronize":
@@ -73,9 +78,11 @@ function processPRUpdate(reqBody) {
 				InstanceManager.GetInstance(PRid).edit()
 			} catch (e) {
 				new InstanceManager({
-					Branch: branchName,
-					PRID: PRid,
-					SourceRepoFullName: repo
+					"Branch": branchName,
+					"PRID": PRid,
+					"SourceRepoFullName": repo,
+					"PRRepoAccount": prRepoAuthor,
+					"PRRepoName": prRepo
 				}).edit()
 			}
 			//Kill, and rebuild
@@ -87,9 +94,11 @@ function processPRUpdate(reqBody) {
 				InstanceManager.GetInstance(PRid).remove()
 			} catch (e) {
 				new InstanceManager({
-					Branch: branchName,
-					PRID: PRid,
-					SourceRepoFullName: repo
+					"Branch": branchName,
+					"PRID": PRid,
+					"SourceRepoFullName": repo,
+					"PRRepoAccount": prRepoAuthor,
+					"PRRepoName": prRepo
 				}).remove()
 			}
 			break;

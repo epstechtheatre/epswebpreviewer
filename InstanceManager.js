@@ -16,7 +16,9 @@ class ProcessQueue extends Array {
         super();
         this.parent = Parent
         this.running = false
-    } 
+
+        return this;
+    }
 
     AddProcess(callback) {
         super.push(callback)
@@ -55,7 +57,7 @@ class ProcessQueue extends Array {
     
             while (snapshot.length > 0) { //For all the items in the snapshot, run them one by one
                 let instance = snapshot.shift()
-                await instance;
+                await instance(Me.parent);
             }
             
             if (Me.length > 0) { //If new tasks have come in since the task started, recurse back into another pass
@@ -119,16 +121,15 @@ class PRInstance {
     async download() {
         this.processQueue.AddProcess(callback)
 
-        let Me = this
-        function callback() {
+        function callback(Me) {
             return new Promise(async function (resolve, reject) {
                 //Check if already exists, if so, stop this and swap to edit
-                if (Me.#dirExists()) {
+                if (Me.dirExists()) {
                     await Me.edit()
                     resolve()
     
                 } else {
-                    await Me.#downloadDir()
+                    await Me.downloadDir()
                     if (Me.activateJekyll()) {
                         await Me.comment()
                         resolve()
@@ -141,13 +142,12 @@ class PRInstance {
     async edit() {
         this.processQueue.AddProcess(callback)
         
-        let Me = this
-        function callback() {
+        function callback(Me) {
             return new Promise(async function (resolve, reject) {
                 Me.killJekyll()
     
-                await Me.#deleteDir()
-                await Me.#downloadDir()
+                await Me.deleteDir()
+                await Me.downloadDir()
                 if (Me.activateJekyll()) {
                     await Me.comment("edit")
                     resolve()
@@ -159,11 +159,10 @@ class PRInstance {
     async remove(forceRelease = false) {
         this.processQueue.AddProcess(callback)
 
-        let Me = this
-        function callback() {
+        function callback(Me) {
             return new Promise(async function (resolve, reject) {
                 Me.killJekyll()
-                await Me.#deleteDir()
+                await Me.deleteDir()
                 //We don't want to remove this because if the PR gets immediately reopened, we should keep track of the process queue. Next time the script restarts, it will be released
                 if (forceRelease) {
                     delete PRInstance.instances[Me.options.PRID]
@@ -174,7 +173,7 @@ class PRInstance {
         }
     }
 
-    async #downloadDir() {
+    async downloadDir() {
         let Me = this
         return new Promise(function (resolve, reject) {
             download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `site_instances/${Me.options.PRID}`, function(err) {
@@ -189,10 +188,10 @@ class PRInstance {
         })
     }
 
-    #deleteDir() {
+    deleteDir() {
         let Me = this
         return new Promise(function (resolve, reject) {
-            if (!Me.#dirExists()) {
+            if (!Me.dirExists()) {
                 resolve()
             } else {
                 fs.rm(`site_instances/${Me.options.PRID}`, {"recursive": true}, function() {
@@ -204,7 +203,7 @@ class PRInstance {
 
     }
 
-    #dirExists() {
+    dirExists() {
         if (fs.existsSync(`site_instances/${this.options.PRID}`)) {
             return true
         } else {
@@ -219,14 +218,17 @@ class PRInstance {
         } else {
             let Me = this
             //Set a 6 hour timeout, after this time, close the Jekyll process
-            this.assignedPort = this.#PRidToInt() + config.Starting_Port
+            this.assignedPort = this.PRidToInt() + config.Starting_Port
 
             this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`, `--no-watch`], {
                 cwd: `site_instances/${this.options.PRID}/docs`,
             })
             this.process.stdout.on("data", data => {
                 console.log(`stdout from PR ${Me.options.PRID} jekyll child: ${data}`)
+            })
 
+            this.process.on("error", err => {
+                return false
             })
 
             this.processTimeout = setTimeout(function() {
@@ -241,22 +243,23 @@ class PRInstance {
      * @param {"new"|"edit"} type 
      */
     comment(type = "new") {
+        let Me = this
         return new Promise(function (resolve, reject) {
             let comment = ""
             switch (type) {
                 case "new":
                     comment = `Your proposed changes have been downloaded successfully!
-                    [Click Here](http://${config.LinkToDomain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes. 
+                    [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") to preview the wiki with your changes. 
                     The preview site will remain active for a six hour period following the most recent update. It will close after this time, or when your changes are merged. Whichever happens first.`
                     break;
     
                 case "edit":
                     comment = `Your latest changes have been downloaded successfully! 
-                    [Click Here](http://${config.LinkToDomain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes.`
+                    [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") to preview the wiki with your changes.`
                     break;
             }
     
-            gh.getIssues(this.options.PRRepoAccount, this.options.PRRepoName).createIssueComment(this.#PRidToInt(), comment, () => {
+            gh.getIssues(Me.options.PRRepoAccount, Me.options.PRRepoName).createIssueComment(Me.PRidToInt(), comment, () => {
                 resolve()
             })
         })
@@ -276,7 +279,7 @@ class PRInstance {
         }
     }
 
-    #PRidToInt() {
+    PRidToInt() {
         let output = parseInt(this.options.PRID)
 
         if (isNaN(output)) {
