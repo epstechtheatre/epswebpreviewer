@@ -121,6 +121,10 @@ class PRInstance {
     async download() {
         this.processQueue.AddProcess(callback)
 
+        /**
+         * 
+         * @param {PRInstance} Me 
+         */
         function callback(Me) {
             return new Promise(async function (resolve, reject) {
                 //Check if already exists, if so, stop this and swap to edit
@@ -220,6 +224,7 @@ class PRInstance {
             //Set a 6 hour timeout, after this time, close the Jekyll process
             this.assignedPort = this.PRidToInt() + config.Starting_Port
 
+            console.log(`Activating Jekyll Instance for PR ${this.options.PRID}`)
             this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`, `--no-watch`], {
                 cwd: `./site_instances/${this.options.PRID}/docs`,
             })
@@ -228,6 +233,7 @@ class PRInstance {
             })
 
             this.process.on("error", err => {
+                console.error(`Error in Jekyll Instance for PR ${this.options.PRID}`)
                 return false
             })
 
@@ -319,9 +325,11 @@ function getInternalIP() {
 
     if (Object.keys(results).length === 1) {
         if (results[Object.keys(results)[0]].length === 1) {
+            console.log(`IP detected: ${results[Object.keys(results)[0]][0]}`)
             return results[Object.keys(results)[0]][0]
         } else {
             if (results["eth0"]) {
+                console.log(`IP detected: ${results["eth0"][0]}`)
                 return results["eth0"][0]
             } else {
                 throw Error("Cannot find internal IP")
