@@ -11,6 +11,63 @@ var gh = new Github({
     "token": auth.token
 })
 
+class ProcessQueue extends Array {
+    constructor(Parent) {
+        this.parent = Parent
+        this.running = false
+    } 
+
+    AddProcess(callback) {
+        super.push(callback)
+
+        if (!this.running) {
+            this.runtime = this.process()
+        }
+    }
+
+
+    getRuntime() {
+        if (this.runtime) {
+            return this.runtime
+        } else {
+            return Promise.resolve();
+        }
+    }
+
+    snapshot() {
+        return [...this]
+    }
+
+    process(recur = false) {
+        if (!recur && this.running) { //Second instance might be trying to run
+            return
+        }
+    
+        let Me = this;
+        //Uploads changing to the external database, in the order they come in. This ensures that updates aren't dropped because of asynchronous tasks  
+        return new Promise(async function (resolve, reject) {
+            Me.running = true; //Global variable announce that the save task is running
+    
+            let snapshot = Me.snapshot() //Clone by value the current save queue 
+
+            Me.splice(0, snapshot.length)//Splice the processing tasks out of the save queue
+    
+            while (snapshot.length > 0) { //For all the items in the snapshot, run them one by one
+                let instance = snapshot.shift()
+                await instance;
+            }
+            
+            if (Me.length > 0) { //If new tasks have come in since the task started, recurse back into another pass
+                await Me.process(true);
+            }
+    
+            if (!recur) { //If the parent instance gets here, we're done
+                Me.running = false; 
+            }
+            resolve();
+        })
+    }
+}
 class PRInstance {
     /**
      * @type {Object.<string, PRInstance}
@@ -53,36 +110,61 @@ class PRInstance {
 
         PRInstance.instances[this.options.PRID] = this
 
+        this.processQueue = new ProcessQueue(this)
+
         return this
     }
 
-    async download() {
-        //Check if already exists, if so, stop this and swap to edit
-        if (this.#dirExists()) {
-            await this.edit()
+    
 
-        } else {
-            await this.#downloadDir()
-            if (this.activateJekyll()) {
-                await this.comment()
-            }
+    async download() {
+        this.processQueue.AddProcess(callback)
+
+        let Me = this
+        function callback() {
+            return new Promise(async function (resolve, reject) {
+                //Check if already exists, if so, stop this and swap to edit
+                if (Me.#dirExists()) {
+                    await Me.edit()
+    
+                } else {
+                    await Me.#downloadDir()
+                    if (Me.activateJekyll()) {
+                        await Me.comment()
+                    }
+                }
+            })
         }
     }
 
     async edit() {
-        this.killJekyll()
-
-        await this.#deleteDir()
-        await this.#downloadDir()
-        if (this.activateJekyll()) {
-            await this.comment("edit")
+        this.processQueue.AddProcess(callback)
+        
+        let Me = this
+        function callback() {
+            return new Promise(async function (resolve, reject) {
+                Me.killJekyll()
+    
+                await Me.#deleteDir()
+                await Me.#downloadDir()
+                if (Me.activateJekyll()) {
+                    await Me.comment("edit")
+                }
+            })
         }
     }
 
     async remove() {
-        this.killJekyll()
-        await this.#deleteDir()
-        delete PRInstance.instances[this.options.PRID]
+        this.processQueue.AddProcess(callback)
+
+        let Me = this
+        function callback() {
+            return new Promise(async function (resolve, reject) {
+                Me.killJekyll()
+                await Me.#deleteDir()
+                delete PRInstance.instances[Me.options.PRID]
+            })
+        }
     }
 
     async #downloadDir() {
