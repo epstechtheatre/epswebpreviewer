@@ -194,7 +194,7 @@ class PRInstance {
             if (!Me.dirExists()) {
                 resolve()
             } else {
-                fs.rm(`site_instances/${Me.options.PRID}`, {"recursive": true}, function() {
+                fs.rmdir(`site_instances/${Me.options.PRID}`, {"recursive": true}, function() {
                     console.info(`Successfully Deleted Cache for PR ${Me.options.PRID}`)
                     resolve()
                 })
