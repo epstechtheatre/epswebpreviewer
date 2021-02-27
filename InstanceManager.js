@@ -5,7 +5,8 @@ const fs = require("fs")
 const {spawn} = require("child_process")
 const Github = require("github-api");
 const auth = require("./auth.json")
-const config = require("./config.json")
+const config = require("./config.json");
+const { fn } = require("moment");
 
 var gh = new Github({
     "token": auth.token
@@ -88,11 +89,20 @@ class PRInstance {
     async #downloadDir() {
         let Me = this
         return new Promise(function (resolve, reject) {
+            if (!Me.#dirExists()) {
+                fs.mkdirSync(`site_instances/${Me.options.PRID}`)
+            }
+
             download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `site_instances/${Me.options.PRID}`, function(err) {
                 if (!err) {
                     console.info(`Successfully Downloaded for PR ${Me.options.PRID}`)
                     resolve()
                 } else {
+                    //Delete the directory so we don't leave artifacts
+                    if (Me.#dirExists()) {
+                        fs.rm(`site_instances/${Me.options.PRID}`, {"recursive": true, "force": true })
+                    }
+
                     console.error(`Error Downloading for PR ${Me.options.PRID}: ${err}`)
                     reject(err)
                 }
