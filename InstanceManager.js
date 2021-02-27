@@ -149,11 +149,11 @@ class PRInstance {
         let comment = ""
         switch (type) {
             case "new":
-                comment = `Your proposed changes have been downloaded successfully! [Click Here](${config.Domain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes. The preview site will remain active for a six hour period following the most recent update. It will close after this time, or when your changes are merged. Whichever happens first.`
+                comment = `Your proposed changes have been downloaded successfully! [Click Here](http://${config.Domain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes. The preview site will remain active for a six hour period following the most recent update. It will close after this time, or when your changes are merged. Whichever happens first.`
                 break;
 
             case "edit":
-                comment = `Your latest changes have been downloaded successfully! [Click Here](${config.Domain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes.`
+                comment = `Your latest changes have been downloaded successfully! [Click Here](http://${config.Domain}:${this.assignedPort} "Click to go to preview site") to preview the wiki with your changes.`
                 break;
         }
 
