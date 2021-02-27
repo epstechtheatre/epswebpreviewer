@@ -124,19 +124,13 @@ class PRInstance {
         function callback(Me) {
             return new Promise(async function (resolve, reject) {
                 //Check if already exists, if so, stop this and swap to edit
-                console.log("Download")
-
                 if (Me.dirExists()) {
-                    console.log("I am transferring to edit")
                     await Me.edit()
                     resolve()
     
                 } else {
-                    console.log("I am continuing as planning")
                     await Me.downloadDir()
-                    console.log("I am downloading")
                     if (Me.activateJekyll()) {
-                        console.log("I have activated Jekyll")
                         await Me.comment()
                         resolve()
                     }
@@ -151,10 +145,8 @@ class PRInstance {
         function callback(Me) {
             return new Promise(async function (resolve, reject) {
                 Me.killJekyll()
-
-                console.log("I am deleting the directory")
+    
                 await Me.deleteDir()
-                console.log("I am downloading")
                 await Me.downloadDir()
                 if (Me.activateJekyll()) {
                     await Me.comment("edit")
@@ -212,9 +204,7 @@ class PRInstance {
     }
 
     dirExists() {
-        
         if (fs.existsSync(`site_instances/${this.options.PRID}`)) {
-            console.log("The Directory Exists")
             return true
         } else {
             return false
