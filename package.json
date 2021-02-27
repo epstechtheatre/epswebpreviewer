@@ -18,6 +18,7 @@
   "homepage": "https://github.com/epstechtheatre/epswebpreviewer#readme",
   "dependencies": {
     "body-parser": "^1.19.0",
+    "download-git-repo": "^3.0.2",
     "express": "^4.17.1",
     "github-api": "^3.4.0"
   }
