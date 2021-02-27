@@ -2,7 +2,7 @@
 const download_repo_git = require("download-git-repo") 
 
 const fs = require("fs")
-const {exec} = require("child_process")
+const {spawn} = require("child_process")
 const Github = require("github-api");
 const auth = require("./auth.json")
 const config = require("./config.json")
@@ -125,15 +125,14 @@ class PRInstance {
             console.error("[activateJekyll] malformed instance! Skipping...")
             return false
         } else {
+            let Me = this
             //Set a 6 hour timeout, after this time, close the Jekyll process
             this.assignedPort = this.#PRidToInt() + config.Starting_Port
 
-            this.process = exec(`bundle exec jekyll serve -P ${(this.assignedPort).toString()} -H ${config.InternalIP}`, {
+            this.process = spawn(`bundle exec jekyll serve`, [`-P ${(this.assignedPort).toString()}`, `-H ${config.InternalIP}`], {
                 cwd: `site_instances/${this.options.PRID}/docs`,
-                
             })
 
-            let Me = this
             this.processTimeout = setTimeout(function() {
                 Me.killJekyll()
             }, 1000 * 60 * 60 * 6)
@@ -163,7 +162,7 @@ class PRInstance {
     }
 
     killJekyll() {
-        this.process?.exit()
+        this.process?.kill()
 
         if (this.processTimeout) {
             clearInterval(this.processTimeout)
