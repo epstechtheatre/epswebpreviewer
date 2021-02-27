@@ -80,8 +80,8 @@ class PRInstance {
     }
 
     async remove() {
-        await this.#deleteDir()
         this.killJekyll()
+        await this.#deleteDir()
         delete PRInstance.instances[this.options.PRID]
     }
 
