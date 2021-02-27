@@ -169,7 +169,7 @@ class PRInstance {
     }
 
     killJekyll() {
-        this.process.stdout.off("data", this.#logStdout)
+        this.process.stdout.off("data", logChildStdout)
         this.process?.kill()
 
         if (this.processTimeout) {
