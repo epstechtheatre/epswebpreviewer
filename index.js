@@ -36,7 +36,7 @@ function validatePR(reqBody) {
 		if (!["opened", "reopened", "synchronize", "closed"].includes(reqBody.action)) {
 			return;
 		}
-		console.log(`Valid Hook Received!`)
+		console.log(`Valid Hook Received! Type: ${reqBody.action} Issue: ${reqBody.number}`)
 
 		//Is now a valid pull request probably
 
