@@ -129,7 +129,7 @@ class PRInstance {
             //Set a 6 hour timeout, after this time, close the Jekyll process
             this.assignedPort = this.#PRidToInt() + config.Starting_Port
 
-            this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P ${(this.assignedPort).toString()}`,`-H ${config.InternalIP}`], {
+            this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${config.InternalIP}`], {
                 cwd: `site_instances/${this.options.PRID}/docs`,
             })
 
