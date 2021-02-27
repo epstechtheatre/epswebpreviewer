@@ -163,7 +163,7 @@ class PRInstance {
     }
 
     killJekyll() {
-        this.process?.kill()
+        this.process?.exit()
 
         if (this.processTimeout) {
             clearInterval(this.processTimeout)
