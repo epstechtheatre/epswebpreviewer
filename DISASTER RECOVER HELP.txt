@@ -1,0 +1,22 @@
+In the event of a total catastrophic failure, these commands and instructions will rebuild the project on the host
+
+1) Install the latest version of node (>14) with latest online tutorials
+    Make sure its path is /usr/bin/node
+        or update other files accordingly
+
+2) Install ruby 2.5 and jekyll with the following commands
+sudo apt-get install ruby-full build-essential zlib1g-dev
+sudo gem install jekyll bundler
+
+3) Cause the code to run with a pr so you get a wiki install (and consecutively hard crash)
+
+4) Run this command in the docs folder of the wiki
+sudo gem install bundler -v "$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1)" 
+
+    Ignore the warnings about how this is really bad practice
+
+    (Installing This takes a while)
+
+5) Load the service file into /etc/systemd/system/
+
+6) use systemctl to make it all work

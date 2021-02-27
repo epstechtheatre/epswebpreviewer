@@ -1,0 +1,13 @@
+[Unit]
+Description=Web Previewer
+
+[Service]
+ExecStart=/usr/bin/node /home/host/scripts/epswebpreviewer/index.js
+Restart=always
+User=host
+# Note Debian/Ubuntu uses 'nogroup', RHEL/Fedora uses 'nobody'
+Group=nogroup
+WorkingDirectory=/home/host/scripts/epswebpreviewer
+
+[Install]
+WantedBy=multi-user.target
