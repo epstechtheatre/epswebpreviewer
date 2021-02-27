@@ -88,8 +88,8 @@ class PRInstance {
     }
 
     static prepSiteDirectory() {
-        if (!fs.existsSync("site_instances")) {
-            fs.mkdirSync("site_instances")
+        if (!fs.existsSync("./site_instances")) {
+            fs.mkdirSync("./site_instances")
         }
     }
 
@@ -176,7 +176,7 @@ class PRInstance {
     async downloadDir() {
         let Me = this
         return new Promise(function (resolve, reject) {
-            download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `site_instances/${Me.options.PRID}`, function(err) {
+            download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `./site_instances/${Me.options.PRID}`, function(err) {
                 if (!err) {
                     console.info(`Successfully Downloaded for PR ${Me.options.PRID}`)
                     resolve()
@@ -194,7 +194,7 @@ class PRInstance {
             if (!Me.dirExists()) {
                 resolve()
             } else {
-                fs.rmdir(`site_instances/${Me.options.PRID}`, {"recursive": true}, function() {
+                fs.rmdir(`./site_instances/${Me.options.PRID}`, {"recursive": true}, function() {
                     console.info(`Successfully Deleted Cache for PR ${Me.options.PRID}`)
                     resolve()
                 })
@@ -204,7 +204,7 @@ class PRInstance {
     }
 
     dirExists() {
-        if (fs.existsSync(`site_instances/${this.options.PRID}`)) {
+        if (fs.existsSync(`./site_instances/${this.options.PRID}`)) {
             return true
         } else {
             return false
@@ -212,7 +212,7 @@ class PRInstance {
     }
 
     activateJekyll() {
-        if (!fs.existsSync(`site_instances/${this.options.PRID}/docs`)) {
+        if (!fs.existsSync(`./site_instances/${this.options.PRID}/docs`)) {
             console.error(`[activateJekyll] malformed instance for PR ${this.options.PRID}! Skipping...`)
             return false
         } else {
@@ -221,7 +221,7 @@ class PRInstance {
             this.assignedPort = this.PRidToInt() + config.Starting_Port
 
             this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`, `--no-watch`], {
-                cwd: `site_instances/${this.options.PRID}/docs`,
+                cwd: `./site_instances/${this.options.PRID}/docs`,
             })
             this.process.stdout.on("data", data => {
                 console.log(`stdout from PR ${Me.options.PRID} jekyll child: ${data}`)
