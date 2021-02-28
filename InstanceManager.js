@@ -257,8 +257,10 @@ class PRInstance {
             switch (type) {
                 case "new":
                     comment = `Hey there, @${Me.options.PRAuthor}!
-                    I've spun up a server so you can preview the wiki with your changes included. It has all the same styling as it will when it's merged to the real thing.
-                    You and other contributors can [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") to go to the preview site.
+                    I've spun up a server so you can preview the wiki with your changes. It has all the same styling as the real wiki, so your changes here will look the exact same when merged.
+                    ## → [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") ← to go to the preview site.
+                    (Other contributors and reviewers may use this to make sure your changes are top-notch)
+                    <br>
                     My resources are limited, so I can only keep the preview open for 6 hours. Don't worry, every time I see more changes show up in this thread I'll make sure to restart the timer, even if 6 hours have already gone by. I'll also plug your latest changes into the preview.
                     Thanks for contributing to the wiki!`
                     break;
