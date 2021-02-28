@@ -54,6 +54,7 @@ function processPRUpdate(reqBody) {
 	let PRid = reqBody.number
 	let prRepo = reqBody.repository.name
 	let prRepoAuthor = reqBody.repository.owner.login
+	let prAuthor = reqBody.sender.login
 
 	switch (reqBody.action) {
 		case "opened":
@@ -67,7 +68,9 @@ function processPRUpdate(reqBody) {
 					"SourceRepoFullName": repo,
 					"PRID": PRid,
 					"PRRepoAccount": prRepoAuthor,
-					"PRRepoName": prRepo
+					"PRRepoName": prRepo,
+					"PRAuthor": prAuthor
+
 				}).download()
 			}
 
@@ -82,7 +85,8 @@ function processPRUpdate(reqBody) {
 					"PRID": PRid,
 					"SourceRepoFullName": repo,
 					"PRRepoAccount": prRepoAuthor,
-					"PRRepoName": prRepo
+					"PRRepoName": prRepo,
+					"PRAuthor": prAuthor
 				}).edit()
 			}
 			//Kill, and rebuild
@@ -98,13 +102,14 @@ function processPRUpdate(reqBody) {
 					"PRID": PRid,
 					"SourceRepoFullName": repo,
 					"PRRepoAccount": prRepoAuthor,
-					"PRRepoName": prRepo
+					"PRRepoName": prRepo,
+					"PRAuthor": prAuthor
 				}).remove()
 			}
 			break;
 
 		default:
-			console.log(reqBody.action)
+			console.log(`Unsupported PR Action type: ${reqBody.action}`)
 			//Best to just leave it for now
 			break;
 	}

@@ -99,7 +99,8 @@ class PRInstance {
      * @property {String} SourceRepoFullName Full Name of the Repo merging to the project 
      * @property {String} Branch Branch name of the repo being merged
      * @property {String} PRRepoAccount Repo account owner of the project
-     * @property {String} PRRepoName Name of the project
+     * @property {String} PRRepoName Name of the repo the PR is coming from
+     * @property {String} PRAuthor Name of the user merging the PR
      */
 
     /**
@@ -255,14 +256,16 @@ class PRInstance {
             let comment = ""
             switch (type) {
                 case "new":
-                    comment = `Your proposed changes have been downloaded successfully!
-                    [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") to preview the wiki with your changes. 
-                    The preview site will remain active for a six hour period following the most recent update. It will close after this time, or when your changes are merged. Whichever happens first.`
+                    comment = `Hey there, @${Me.options.PRAuthor}!
+                    I've spun up a server so you can preview the wiki with your changes included. It has all the same styling as it will when it's merged to the real thing.
+                    You and other contributors can [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") to go to the preview site.
+                    My resources are limited, so I can only keep the preview open for 6 hours. Don't worry, every time I see more changes show up in this thread I'll make sure to restart the timer, even if 6 hours have already gone by. I'll also plug your latest changes into the preview.
+                    Thanks for contributing to the wiki!`
                     break;
     
                 case "edit":
-                    comment = `Your latest changes have been downloaded successfully! 
-                    [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") to preview the wiki with your changes.`
+                    comment = `I've plugged your latest changes into the preview, so I'll keep the site open for another 6 hours.
+                    [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") to go to the preview site`
                     break;
             }
     
@@ -276,6 +279,7 @@ class PRInstance {
     killJekyll() {
         if (this.process) {
             this.process?.kill()
+            delete this.process
             console.log(`Disabled Jekyll for PR ${this.options.PRID}!`)
         }
 
