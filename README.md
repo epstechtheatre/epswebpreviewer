@@ -1,7 +1,7 @@
 # EPS Web Preview
 A nodejs script to track, download, and enable seamless contribution for pull requests.
 
-This utility is maintained and hosted by Ben MacDonald (@Quantum158), on behalf of the E.P. Scarlett Technical Theatre Crew.
+This utility is maintained and hosted by [Ben MacDonald](https://github.com/Quantum158), on behalf of the E.P. Scarlett Technical Theatre Crew.
 
 
 ## Functions
