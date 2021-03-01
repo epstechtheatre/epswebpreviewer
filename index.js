@@ -6,9 +6,6 @@ const InstanceManager = require("./InstanceManager.js")
 const PortManager = require("./PortManager.js")
 const config = require("./config.json")
 
-//const PR_IDLE_WAIT = 15000 //15 seconds, ensures that latest zip is ready before downloading
-const PR_IDLE_WAIT = require("./config.json").PR_IDLE_WAIT //15 seconds, ensures that latest zip is ready before downloading
-
 // Initialize express and define a port
 const app = express()
 const PORT = 9193
@@ -45,12 +42,12 @@ function validatePR(reqBody) {
 		}
 		console.log(`Valid Hook Received!\nType: ${reqBody.action} | Issue: ${reqBody.number}`)
 
-		//Is now a valid pull request
+		//If we make it here, it is a valid pull request
 
 		//Lets wait 15 seconds or so before process, just so that zips of the repo are up to date
 		setTimeout(function() {
 			processPRUpdate(reqBody)
-		}, PR_IDLE_WAIT)
+		}, config.PR_IDLE_WAIT_MS) //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip
 	}
 }
 

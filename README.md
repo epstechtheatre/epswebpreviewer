@@ -12,4 +12,3 @@ The bot attempts to keep each instance open for 6 hours following the most recen
 
 ## Usage
 This project was designed exclusively for use by the E.P. Scarlett Technical Theatre Wiki Project. As per the project license, the software is provided "as is". Authors are released from any obligation to update or patch code should it not work for others.  
-

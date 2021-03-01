@@ -28,7 +28,7 @@ comment = `I've plugged your latest changes into the preview, so I'll keep the s
             }
 
             default:
-comment = `Something happened that I was not prepared to deal with internally. Thanks for contributing though.`
+comment = `Something happened that I was not prepared to deal with internally. I was supposed to comment a link to a preview but it broke. Thanks for contributing though.`
         }
     }
 }
