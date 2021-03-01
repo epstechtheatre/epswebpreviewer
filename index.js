@@ -3,6 +3,8 @@ const express = require("express")
 const bodyParser = require("body-parser")
 
 const InstanceManager = require("./InstanceManager.js")
+const PortManager = require("./PortManager.js")
+const config = require("./config.json")
 
 //const PR_IDLE_WAIT = 15000 //15 seconds, ensures that latest zip is ready before downloading
 const PR_IDLE_WAIT = require("./config.json").PR_IDLE_WAIT //15 seconds, ensures that latest zip is ready before downloading
@@ -29,8 +31,13 @@ app.get("/", (req, res) => {
     res.status(200).end()
 })
 
+//Ensure ./site_instances exists
 InstanceManager.prepSiteDirectory()
 
+//Instantiate Port Manager
+const PM = new PortManager(config.minPort, config.maxPort, config.maxConsecutive ?? Infinity)
+
+//Validate incoming PRs to ensure the webhook needs action
 function validatePR(reqBody) {
 	if (reqBody.number) {
 		if (!["opened", "reopened", "synchronize", "closed"].includes(reqBody.action)) {
@@ -47,8 +54,10 @@ function validatePR(reqBody) {
 	}
 }
 
+//Process PR updates
 function processPRUpdate(reqBody) {
-	//Lets figure out what stage the PR is in
+
+	//Get the PR information
 	let branchName = reqBody.pull_request.head.ref
 	let repo = reqBody.pull_request.head.repo.full_name
 	let PRid = reqBody.number
@@ -56,6 +65,7 @@ function processPRUpdate(reqBody) {
 	let prRepoAuthor = reqBody.repository.owner.login
 	let prAuthor = reqBody.sender.login
 
+	//Lets figure out what stage the PR is in
 	switch (reqBody.action) {
 		case "opened":
 		case "reopened":
@@ -63,7 +73,7 @@ function processPRUpdate(reqBody) {
 			try {
 				InstanceManager.GetInstance(PRid).download()
 			} catch (e) {
-				new InstanceManager({
+				new InstanceManager(PM, {
 					"Branch": branchName,
 					"SourceRepoFullName": repo,
 					"PRID": PRid,
@@ -76,11 +86,12 @@ function processPRUpdate(reqBody) {
 
 			break;
 
-		case "synchronize":
+		case "synchronize": //Fancy term for "more commits added"
+			//Kill, and rebuild
 			try {
 				InstanceManager.GetInstance(PRid).edit()
 			} catch (e) {
-				new InstanceManager({
+				new InstanceManager(PM, {
 					"Branch": branchName,
 					"PRID": PRid,
 					"SourceRepoFullName": repo,
@@ -89,7 +100,6 @@ function processPRUpdate(reqBody) {
 					"PRAuthor": prAuthor
 				}).edit()
 			}
-			//Kill, and rebuild
 			break
 
 		case "closed":
@@ -97,7 +107,7 @@ function processPRUpdate(reqBody) {
 			try {
 				InstanceManager.GetInstance(PRid).remove()
 			} catch (e) {
-				new InstanceManager({
+				new InstanceManager(PM, {
 					"Branch": branchName,
 					"PRID": PRid,
 					"SourceRepoFullName": repo,

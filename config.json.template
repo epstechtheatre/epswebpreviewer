@@ -2,5 +2,9 @@
     "LinkToDomain": "a.b.c.d",
     "InternalIPOverride": "1.2.3.4",
     "Starting_Port": 40000,
-    "PR_IDLE_WAIT": 15000
+    "PR_IDLE_WAIT_MS": 15000,
+    "minPort": 40000,
+    "maxPort": 50000,
+    "maxConsecutive": 0,
+    "PR_STALE_TIMEOUT_HOURS": 6
 }

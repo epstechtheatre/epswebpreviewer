@@ -6,12 +6,21 @@ const {spawn} = require("child_process")
 const Github = require("github-api");
 const auth = require("./auth.json")
 const config = require("./config.json");
+const Comments = require("./comments.js")
+const PortManager = require("./PortManager");
 
 var gh = new Github({
     "token": auth.token
 })
 
+/**
+ * Queue asynchronous tasks to run in a defined order, while retaining the benefits of asynchronous code.
+ */
 class ProcessQueue extends Array {
+    /**
+     * Construct a process queue for a Instance Manager
+     * @param {PRInstance} Parent 
+     */
     constructor(Parent) {
         super();
         this.parent = Parent
@@ -20,15 +29,22 @@ class ProcessQueue extends Array {
         return this;
     }
 
+    /**
+     * Add a asynchronous promise to the process queue
+     * @param {Promise} callback 
+     */
     AddProcess(callback) {
         super.push(callback)
 
         if (!this.running) {
-            this.runtime = this.process()
+            this.runtime = this.#process()
         }
     }
 
-
+    /**
+     * Get the current runtime of the process queue. Returns a resolve promise if the runtime is not currently active.
+     * @returns {Promise}
+     */
     getRuntime() {
         if (this.runtime) {
             return this.runtime
@@ -41,7 +57,13 @@ class ProcessQueue extends Array {
         return [...this]
     }
 
-    process(recur = false) {
+    /**
+     * @private
+     * Start the process queue, it will run till the queue is empty
+     * @param {Boolean} recur
+     * @returns {Promise}
+     */
+    #process(recur = false) {
         if (!recur && this.running) { //Second instance might be trying to run
             return
         }
@@ -71,6 +93,7 @@ class ProcessQueue extends Array {
         })
     }
 }
+
 class PRInstance {
     /**
      * @type {Object.<string, PRInstance}
@@ -105,11 +128,12 @@ class PRInstance {
 
     /**
      * 
+     * @param {PortManager} PortManager
      * @param {PRInstanceOptions} options 
-     * @param {"opened"|"edited"|"closed"} [overrideState="opened"] Default opened
      * @returns {PRInstance} Instance registered in memory and can be recalled with the PR ID
      */
-    constructor(options) {
+    constructor(PortManager, options) {
+        this.PortManager = PortManager
         this.options = options
 
         PRInstance.instances[this.options.PRID] = this
@@ -129,14 +153,22 @@ class PRInstance {
         function callback(Me) {
             return new Promise(async function (resolve, reject) {
                 //Check if already exists, if so, stop this and swap to edit
-                if (Me.dirExists()) {
+                if (Me.instanceDirExists()) {
                     await Me.edit()
                     resolve()
     
                 } else {
-                    await Me.downloadDir()
-                    if (Me.activateJekyll()) {
-                        await Me.comment()
+                    try {
+                        await Me.downloadDir()
+                        if (Me.activateJekyll()) {
+                            await Me.comment()
+                        }
+                    } catch {
+                        //Right now, don't do anything, maybe in the future this will change
+
+                    } finally {
+                        //Want to make sure that regardless of what happens, the promise is fulfilled
+
                         resolve()
                     }
                 }
@@ -147,14 +179,25 @@ class PRInstance {
     async edit() {
         this.processQueue.AddProcess(callback)
         
+        /**
+         * 
+         * @param {PRInstance} Me 
+         */
         function callback(Me) {
             return new Promise(async function (resolve, reject) {
+                //Start by killing any open instance of this PR
                 Me.killJekyll()
     
-                await Me.deleteDir()
-                await Me.downloadDir()
-                if (Me.activateJekyll()) {
-                    await Me.comment("edit")
+                try {
+                    await Me.deleteDir()
+                    await Me.downloadDir()
+                    if (Me.activateJekyll()) {
+                        await Me.comment("edit")
+                    }
+                } catch {
+                    //Right now, don't do anything, maybe in the future this will change
+
+                } finally {
                     resolve()
                 }
             })
@@ -164,16 +207,27 @@ class PRInstance {
     async remove(forceRelease = false) {
         this.processQueue.AddProcess(callback)
 
+        /**
+         * 
+         * @param {PRInstance} Me 
+         */
         function callback(Me) {
             return new Promise(async function (resolve, reject) {
                 Me.killJekyll()
-                await Me.deleteDir()
-                //We don't want to remove this because if the PR gets immediately reopened, we should keep track of the process queue. Next time the script restarts, it will be released
-                if (forceRelease) {
-                    delete PRInstance.instances[Me.options.PRID]
-                }
+                
+                try {
+                    await Me.deleteDir()
 
-                resolve()
+                    //We should keep track of closed PRs and there is a change it will be reopened immediately (and so it needs to be in the process queue)
+                    if (forceRelease) {
+                        //Forcefully remove the cache of this Instance
+                        delete PRInstance.instances[Me.options.PRID]
+                    }
+                } catch (e) {
+                    //Right now, don't do anything, maybe in the future this will change
+                } finally {
+                    resolve()
+                }
             })
         }
     }
@@ -181,7 +235,7 @@ class PRInstance {
     async downloadDir() {
         let Me = this
         return new Promise(function (resolve, reject) {
-            download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `./site_instances/${Me.options.PRID}`, function(err) {
+            download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `./site_instances/${Me.options.PRID.toString()}`, function(err) {
                 if (!err) {
                     console.info(`Successfully Downloaded for PR ${Me.options.PRID}`)
                     resolve()
@@ -196,10 +250,10 @@ class PRInstance {
     deleteDir() {
         let Me = this
         return new Promise(function (resolve, reject) {
-            if (!Me.dirExists()) {
+            if (!Me.instanceDirExists()) {
                 resolve()
             } else {
-                fs.rmdir(`./site_instances/${Me.options.PRID}`, {"recursive": true}, function() {
+                fs.rmdir(`./site_instances/${Me.options.PRID.toString()}`, {"recursive": true}, function() {
                     console.info(`Successfully Deleted Cache for PR ${Me.options.PRID}`)
                     resolve()
                 })
@@ -208,8 +262,8 @@ class PRInstance {
 
     }
 
-    dirExists() {
-        if (fs.existsSync(`./site_instances/${this.options.PRID}`)) {
+    instanceDirExists() {
+        if (fs.existsSync(`./site_instances/${this.options.PRID.toString()}`)) {
             return true
         } else {
             return false
@@ -217,13 +271,23 @@ class PRInstance {
     }
 
     activateJekyll() {
-        if (!fs.existsSync(`./site_instances/${this.options.PRID}/docs`)) {
+        if (!fs.existsSync(`./site_instances/${this.options.PRID.toString()}/docs`)) {
             console.error(`[activateJekyll] malformed instance for PR ${this.options.PRID}! Skipping...`)
             return false
         } else {
             let Me = this
-            //Set a 6 hour timeout, after this time, close the Jekyll process
-            this.assignedPort = this.PRidToInt() + config.Starting_Port
+
+            //Create a port assignment - Attempt to have the port ID be the same as the PR id, but we can't always have nice things
+            try {
+                if (this.PortManager.checkIfAvailable(this.options.PRID + config.minPort)) {
+                    this.assignedPort = this.PortManager.bindManual(this.options.PRID, this)
+                } else {
+                    this.assignedPort = this.PortManager.bindAuto(this)
+                }
+            } catch {
+                //Max port probably reached
+                return false
+            }
 
             console.log(`Activating Jekyll Instance for PR ${this.options.PRID}`)
             this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`, `--no-watch`], {
@@ -235,13 +299,14 @@ class PRInstance {
             })
 
             this.process.on("error", err => {
-                console.error(`Error in Jekyll Instance for PR ${this.options.PRID}`)
+                console.error(`Error in Jekyll Instance for PR ${this.options.PRID}: ${err}`)
                 return false
             })
 
+            //Set a timeout, after this time, close the Jekyll process
             this.processTimeout = setTimeout(function() {
                 Me.killJekyll()
-            }, 1000 * 60 * 60 * 6)
+            }, 1000 * 60 * 60 * config.PR_STALE_TIMEOUT_HOURS /*convert to milliseconds*/)
         }
         return true
     }
@@ -253,28 +318,11 @@ class PRInstance {
     comment(type = "new") {
         let Me = this
         return new Promise(function (resolve, reject) {
-            let comment = ""
-            switch (type) {
-                //Tabs are important here because this will be parsed as markdown
-                case "new": {
-comment = `Hey there, @${Me.options.PRAuthor}!
-I've spun up a server so you can preview the wiki with your changes. It has all the same styling as the real wiki, so your changes here will look the exact same when merged.
-## → [Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") ← to go to the preview site.
-(Other contributors and reviewers may use this to make sure your changes are top-notch)
-<br>
-My resources are limited, so I can only keep the preview open for 6 hours. Don't worry, every time I see more changes show up in this thread I'll make sure to restart the timer, even if 6 hours have already gone by. I'll also plug your latest changes into the preview.
-Thanks for contributing to the wiki!`
-                    break;
-                }
+            let string = Comments.createCommentString(Me.options.PRAuthor, config.LinkToDomain, Me.assignedPort, type)
+            
     
-                case "edit": {
-comment = `I've plugged your latest changes into the preview, so I'll keep the site open for another 6 hours.
-[Click Here](http://${config.LinkToDomain}:${Me.assignedPort} "Click to go to preview site") to go to the preview site`
-                    break;
-                }
-            }
-    
-            gh.getIssues(Me.options.PRRepoAccount, Me.options.PRRepoName).createIssueComment(Me.PRidToInt(), comment, () => {
+            gh.getIssues(Me.options.PRRepoAccount, Me.options.PRRepoName).createIssueComment(Me.options.PRID, string, (comment) => {
+                console.log(`Commented to PR ${Me.options.PRID}`)
                 resolve()
             })
         })
@@ -288,20 +336,16 @@ comment = `I've plugged your latest changes into the preview, so I'll keep the s
             console.log(`Disabled Jekyll for PR ${this.options.PRID}!`)
         }
 
+        //Incase this runs with no process
+        if (!this.PortManager.checkIfAvailable(this.assignedPort)) {
+            this.PortManager.release(this.assignedPort)
+            delete this.assignedPort
+        }
+
+        //Make sure to clear timeout as well!
         if (this.processTimeout) {
-            //Make sure to clear timeout as well!
             clearInterval(this.processTimeout)
             delete this.processTimeout
-        }
-    }
-
-    PRidToInt() {
-        let output = parseInt(this.options.PRID)
-
-        if (isNaN(output)) {
-            throw Error("[PRidToInt] PRID is not a number!")
-        } else {
-            return output
         }
     }
 }
