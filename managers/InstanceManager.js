@@ -3,15 +3,9 @@ const download_repo_git = require("download-git-repo")
 
 const fs = require("fs")
 const {spawn} = require("child_process")
-const Github = require("github-api");
-const auth = require("./auth.json")
 const config = require("./config.json");
-const Comments = require("./comments.js")
+const Comments = require("./CommentManager.js")
 const PortManager = require("./PortManager");
-
-var gh = new Github({
-    "token": auth.token
-})
 
 /**
  * Queue asynchronous tasks to run in a defined order, while retaining the benefits of asynchronous code.
@@ -322,6 +316,7 @@ class PRInstance {
             
     
             gh.getIssues(Me.options.PRRepoAccount, Me.options.PRRepoName).createIssueComment(Me.options.PRID, string, (comment) => {
+                debugger
                 console.log(`Commented to PR ${Me.options.PRID}`)
                 resolve()
             })
@@ -336,7 +331,7 @@ class PRInstance {
             console.log(`Disabled Jekyll for PR ${this.options.PRID}!`)
         }
 
-        //Incase this runs with no process
+        //Incase the kill ran before initial assignment (which can happen if a PR was opened, the script was restarted (cleared from memory), and then closed)
         if (!this.PortManager.checkIfAvailable(this.assignedPort)) {
             this.PortManager.release(this.assignedPort)
             delete this.assignedPort

@@ -4,6 +4,7 @@ const bodyParser = require("body-parser")
 
 const InstanceManager = require("./InstanceManager.js")
 const PortManager = require("./PortManager.js")
+const CommandManager = require("./managers/CommandManager.js")
 const config = require("./config.json")
 
 // Initialize express and define a port
@@ -33,6 +34,9 @@ InstanceManager.prepSiteDirectory()
 
 //Instantiate Port Manager
 const PM = new PortManager(config.minPort, config.maxPort, config.maxConsecutive ?? Infinity)
+
+//Instantiate Command Manager
+const CM = new CommandManager(PM)
 
 //Validate incoming PRs to ensure the webhook needs action
 function validatePR(reqBody) {
