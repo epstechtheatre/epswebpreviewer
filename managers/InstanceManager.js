@@ -110,6 +110,19 @@ class PRInstance {
         }
     }
 
+    /**
+     * Check if the folder for an instance exists (If an instance exists but is not cached, it implies it was opened before a script reload)
+     * @param {Number|String} PRID
+     * @returns {Boolean} True if exists 
+     */
+    static instanceDirExists(PRID) {
+        if (fs.existsSync(`./site_instances/${PRID.toString()}`)) {
+            return true
+        } else {
+            return false
+        }
+    }
+
     /** 
      * @typedef PRInstanceOptions
      * @property {Number} PRID ID of the Pull Request
