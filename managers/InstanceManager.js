@@ -3,7 +3,7 @@ const download_repo_git = require("download-git-repo")
 
 const fs = require("fs")
 const {spawn} = require("child_process")
-const config = require("./config.json");
+const config = require("../config.json");
 const Comments = require("./CommentManager.js")
 const PortManager = require("./PortManager");
 

@@ -53,3 +53,5 @@ class CommentManager {
         return text.replace(/^\s*/gmi, "") //Remove all spaces at the start of a line
     }
 }
+
+

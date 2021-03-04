@@ -9,7 +9,7 @@ class PortManager {
      * @param {Number} [maxConsecutive=Infinity] The maximum number of consecutive ports that can be open at one time. Defaults to unlimited. (min 1), 0 is unlimited
      */
     constructor(minPort, maxPort, maxConsecutive = Infinity) {
-        if (isNaN(parseInt(minPort)) || isNaN(parseInt(maxConsecutive)) || isNaN(parseInt(maxConsecutive))) {
+        if (isNaN(parseInt(minPort)) || isNaN(parseInt(maxPort)) || isNaN(parseInt(maxConsecutive))) {
             throw Error("[PortManager] non-number provided!")
         }
 

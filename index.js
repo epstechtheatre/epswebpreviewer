@@ -2,8 +2,8 @@
 const express = require("express")
 const bodyParser = require("body-parser")
 
-const InstanceManager = require("./InstanceManager.js")
-const PortManager = require("./PortManager.js")
+const InstanceManager = require("./managers/InstanceManager.js")
+const PortManager = require("./managers/PortManager.js")
 const CommandManager = require("./managers/CommandManager.js")
 const config = require("./config.json")
 
@@ -18,7 +18,7 @@ app.post("/hook", (req, res) => {
 	//console.log(req.body) // Call your action on the request here
 	res.status(200).end() // Responding is important
 
-	validatePR(req.body)
+	parseWebhook(req.body)
 })
 
 
@@ -36,9 +36,21 @@ InstanceManager.prepSiteDirectory()
 const PM = new PortManager(config.minPort, config.maxPort, config.maxConsecutive ?? Infinity)
 
 //Instantiate Command Manager
-const CM = new CommandManager(PM)
+const CM = new CommandManager.CommandManager(PM)
 
-//Validate incoming PRs to ensure the webhook needs action
+/**Determine what type of webhook was received (comment or PR)*/
+function parseWebhook(reqBody) {
+	if (reqBody.issue.pull_request && ["created"].includes(reqBody.action)) { //Is an valid issue comment that is on a PR
+		CM.parse(reqBody)
+	}
+
+	if (reqBody.pull_request.number && ["opened", "reopened", "closed", "synchronize"].includes(reqBody.action)) { //Is a valid PR
+		validatePR(reqBody)
+	}
+}
+
+
+/**Validate incoming PRs to ensure the webhook needs action*/
 function validatePR(reqBody) {
 	if (reqBody.number) {
 		if (!["opened", "reopened", "synchronize", "closed"].includes(reqBody.action)) {
@@ -55,7 +67,7 @@ function validatePR(reqBody) {
 	}
 }
 
-//Process PR updates
+/**Process PR updates*/
 function processPRUpdate(reqBody) {
 
 	//Get the PR information
