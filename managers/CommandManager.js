@@ -17,25 +17,39 @@ class CommandManager {
      * @param {{}} ReqBody 
      */
     parse(ReqBody) {
-        if (/*The Req Body Information the will say this is a comment */ false) {
-            if (CommandManager.Commands["commandText"]) {
-                CommandManager.Commands["commandText"].callback(stuff)
+        let commentBody = ReqBody.comment.body
+        if (commentBody.startsWith("@EPSWebPreview")) {
+            let possibleKeyword = commentBody.split(" ")[1].toLowerCase()
+            if (CommandManager.Commands[possibleKeyword] !== undefined) {
+                //Is a valid command keyword, lets check if the command wants the cmd sender to be the author
+
+                //TODO: CHECK IF THESE ARE THE RIGHT PATHS
+                if (!CommandManager.Commands[possibleKeyword].requireAuthor || ReqBody.sender.login !== ReqBody.issue.pull_request.author.login) {
+                    return
+                }
+
+                //otherwise we can run it
+
+                CommandManager.Commands[possibleKeyword].checkMe()
+
             }
         }
     }
 
 
     /**
-     * @type {Object.<string, Command>}
+     * @type {Object.<string, {Command: Command, requireAuthor: Boolean}>}
      */
     static Commands = {}
 
     /**
      * Called from the Command Class
-     * @param {Command} Command 
+     * @param {String} keyword Will toLowerCase() when called
+     * @param {Command} Command
+     * @param {Boolean} requireAuthor 
      */
-    static registerCommand(keyword, Command) {
-        this.Commands[keyword] = Command
+    static registerCommand(keyword, Command, requireAuthor) {
+        this.Commands[keyword.toLowerCase()] = { "Command": Command, "requireAuthor": requireAuthor}
     }
 }
 
@@ -53,12 +67,14 @@ class Command {
      * 
      * @param {String} keyword 
      * @param {CommandFunction} callback
+     * @param {Boolean} [requireAuthor=true]
      */
-    constructor(keyword, callback) {
+    constructor(keyword, callback, requireAuthor = true) {
         this.keyword = keyword
         this.callback = callback
+        this.requireAuthor = requireAuthor
 
-        CommandManager.registerCommand()
+        CommandManager.registerCommand(this.requireAuthor)
         return this
     }
 
@@ -67,9 +83,7 @@ class Command {
      * @param {String} entered 
      */
     checkMe(entered) {
-        if (entered.toLowerCase() == this.keyword.toLowerCase()) {
-            this.callback()
-        }
+        
     }
 }
 
@@ -81,23 +95,23 @@ module.exports = {
 //Because there is so few commands, I'm just going to write them all in this one file. If this expands, it should probably get a directory
 
 /** @type {CommandFunction} */
-function callback_listCommands(commenter, PRID) {
+function callback_listCommands(comment, commenter, PRID) {
     //List the four commands that can be run. If the commenter is not the PR author, prepend the message saying they can't run commands in this PR
 }
 
 /** @type {CommandFunction} */
-function callback_requestPreview(commenter, PRID) {
+function callback_requestPreview(comment, commenter, PRID) {
     //Check if the instance is running. If false, start a preview instance
 
 }
 
 /** @type {CommandFunction} */
-function callback_destroyPreview(commenter, PRID) {
+function callback_destroyPreview(comment, commenter, PRID) {
     //Check if the instance is running. If true, destroy the instance
 }
 
 /** @type {CommandFunction} */
-function callback_status(commenter, PRID) {
+function callback_status(comment, commenter, PRID) {
     //Check if the preview for the instance is running (this is simple, just need to check if the PRID instance process exists)
 }
 
