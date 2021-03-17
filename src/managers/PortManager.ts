@@ -1,15 +1,15 @@
 /**
  * A helper class to manage port assignment for Jekyll instances. This doesn't actually create the Jekyll server, it just organized what ports are in use.
  */
-class PortManager {
-    /**
-     * Create a port manager instance
-     * @param {Number} minPort The lowest port number to be assigned (min 1)
-     * @param {Number} maxPort The highest port number to be assigned (max 65535)
-     * @param {Number} [maxConsecutive=Infinity] The maximum number of consecutive ports that can be open at one time. Defaults to unlimited. (min 1), 0 is unlimited
-     */
-    constructor(minPort, maxPort, maxConsecutive = Infinity) {
-        if (isNaN(parseInt(minPort)) || isNaN(parseInt(maxPort)) || isNaN(parseInt(maxConsecutive))) {
+export class PortManager {
+    Parent: import("../index").Main
+    minPort: number
+    maxPort: number
+    maxConsecutive: number
+
+
+    constructor(Parent: import("../index").Main, minPort: number, maxPort: number, maxConsecutive:number = Infinity) {
+        if (isNaN(minPort) || isNaN(maxPort) || isNaN(maxConsecutive)) {
             throw Error("[PortManager] non-number provided!")
         }
 
@@ -28,6 +28,7 @@ class PortManager {
         this.minPort = minPort
         this.maxPort = maxPort
         this.maxConsecutive = maxConsecutive
+        this.Parent = Parent
     }
 
     /**
@@ -38,9 +39,8 @@ class PortManager {
 
     /**
      * Check if a given port number is outside of the range of allowed ports
-     * @param {Number} portNumber 
      */
-    checkInRange(portNumber) {
+    checkInRange(portNumber: number) {
         if (portNumber > this.maxPort || portNumber < this.minPort) {
             return portNumber
         }
@@ -48,10 +48,9 @@ class PortManager {
 
     /**
      * Check if a given port number is in use by another instance. 
-     * @param {C} portNumber 
      * @returns {Boolean} true if port is unassigned, false otherwise or if out of range
      */
-    checkIfAvailable(portNumber) {
+    checkIfAvailable(portNumber: number) {
         if (this.checkInRange(portNumber)) {
             return (this.assignments[portNumber] === undefined)
         } else {
@@ -61,9 +60,8 @@ class PortManager {
 
     /**
      * Get what a given port number is bound to. Returns undefined if port is not assigned
-     * @param {Number} portNumber 
      */
-    getBinding(portNumber) {
+    getBinding(portNumber: number) {
         return this.assignments[portNumber] ?? undefined
     }
 
@@ -104,11 +102,10 @@ class PortManager {
 
     /**
      * Manual assign a port ID and a binding.
-     * @param {Number} portNumber The number of port to bind
      * @param {*} ToBind What is using the port
      * @returns {Number} The bound port number. Throws Error if port in use, or if max consecutive ports is reached
      */
-    bindManual(portNumber, ToBind) {
+    bindManual(portNumber: number, ToBind) {
         if (!this.underMaxConsecutive()) {
             throw Error("[bindAuto] Max consecutive assignments reached! Release stale instances before binding more ports.")
         }
@@ -128,10 +125,9 @@ class PortManager {
 
     /**
      * Release a port number. Make sure that whatever was using the port is definitely not using it anymore!
-     * @param {Number} portNumber 
      * @returns {Boolean} true if port released
      */
-    release(portNumber) {
+    release(portNumber: number) {
         if (this.assignments[portNumber] === undefined) {
             throw Error("[release] Port to released not assigned!")
         }
@@ -141,5 +137,3 @@ class PortManager {
         return true
     }
 }
-
-module.exports = PortManager

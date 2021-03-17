@@ -1,3 +1,5 @@
+import { PortManager } from "./PortManager";
+
 //Manages all open instances of servers
 const download_repo_git = require("download-git-repo") 
 
@@ -5,7 +7,6 @@ const fs = require("fs")
 const {spawn} = require("child_process")
 const config = require("../config.json");
 const Comments = require("./CommentManager.js")
-const PortManager = require("./PortManager");
 
 /**
  * Queue asynchronous tasks to run in a defined order, while retaining the benefits of asynchronous code.
@@ -88,7 +89,7 @@ class ProcessQueue extends Array {
     }
 }
 
-class PRInstance {
+export class PRInstance {
     /**
      * @type {Object.<string, PRInstance}
      */
@@ -132,6 +133,9 @@ class PRInstance {
      * @property {String} PRRepoName Name of the repo the PR is coming from
      * @property {String} PRAuthor Name of the user merging the PR
      */
+
+    PortManager: PortManager;
+    options: ;
 
     /**
      * 
@@ -357,8 +361,6 @@ class PRInstance {
         }
     }
 }
-
-module.exports = PRInstance
 
 function getInternalIP() {
     if (config.InternalIPOverride) {

@@ -6,10 +6,10 @@ const PortManager = require("./PortManager.js")
 class CommandManager {
     /**
      * Create a command manager
-     * @param {PortManager} PortManager 
+     * @param {TODO} Parent The parent run class 
      */
-    constructor(PortManager) {
-
+    constructor(Parent) {
+        this.Parent = Parent
     }
 
     /**
@@ -87,10 +87,7 @@ class Command {
     }
 }
 
-module.exports = {
-    CommandManager: CommandManager,
-    Command: Command
-}
+module.exports = CommandManager
 
 //Because there is so few commands, I'm just going to write them all in this one file. If this expands, it should probably get a directory
 
