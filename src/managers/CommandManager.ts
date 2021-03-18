@@ -1,22 +1,27 @@
+import { IssueCommentEvent } from "@octokit/webhooks-definitions/schema"
+
 //The file parses every comment detected to check if it contains a command.
 const InstanceManager = require("./InstanceManager.js")
 const PortManager = require("./PortManager.js")
 
 
-class CommandManager {
+export default class CommandManager {
+
+    static Commands: { [key: string]: {Command: Command, requireAuthor: boolean}} = {}
+
+    Parent: import("../index").Main
+    
     /**
      * Create a command manager
-     * @param {TODO} Parent The parent run class 
      */
-    constructor(Parent) {
+    constructor(Parent: import("../index").Main) {
         this.Parent = Parent
     }
 
     /**
      * Parse a potential command. If the command is valid and the commenter is the author of the PR/a member of the review team, then run the command's callback
-     * @param {{}} ReqBody 
      */
-    parse(ReqBody) {
+    parse(ReqBody: IssueCommentEvent) {
         let commentBody = ReqBody.comment.body
         if (commentBody.startsWith("@EPSWebPreview")) {
             let possibleKeyword = commentBody.split(" ")[1].toLowerCase()
@@ -24,6 +29,8 @@ class CommandManager {
                 //Is a valid command keyword, lets check if the command wants the cmd sender to be the author
 
                 //TODO: CHECK IF THESE ARE THE RIGHT PATHS
+
+                //@ts-expect-error
                 if (!CommandManager.Commands[possibleKeyword].requireAuthor || ReqBody.sender.login !== ReqBody.issue.pull_request.author.login) {
                     return
                 }
@@ -35,12 +42,6 @@ class CommandManager {
             }
         }
     }
-
-
-    /**
-     * @type {Object.<string, {Command: Command, requireAuthor: Boolean}>}
-     */
-    static Commands = {}
 
     /**
      * Called from the Command Class
@@ -86,8 +87,6 @@ class Command {
         
     }
 }
-
-module.exports = CommandManager
 
 //Because there is so few commands, I'm just going to write them all in this one file. If this expands, it should probably get a directory
 

@@ -1,22 +1,34 @@
-import { PortManager } from "./PortManager";
+//Manages the instances of the websites, including building, running and stopping them
+
+import PortManager from "./PortManager";
 
 //Manages all open instances of servers
 const download_repo_git = require("download-git-repo") 
 
-const fs = require("fs")
-const {spawn} = require("child_process")
-const config = require("../config.json");
-const Comments = require("./CommentManager.js")
+import fs from "fs"
+import {spawn} from "child_process"
+import Comments from "./CommentManager.js"
+const gh = require("github-api")
+interface PRInstanceOptions {
+    PRID: number
+    SourceRepoFullName: string
+    Branch: string
+    PRRepoAccount: string
+    PRRepoName: string
+    PRAuthor: string
+}
+
+interface processQueueTask { (Me: PRInstance): Promise<any> }
 
 /**
  * Queue asynchronous tasks to run in a defined order, while retaining the benefits of asynchronous code.
  */
 class ProcessQueue extends Array {
-    /**
-     * Construct a process queue for a Instance Manager
-     * @param {PRInstance} Parent 
-     */
-    constructor(Parent) {
+    parent: PRInstance
+    running: boolean
+    runtime: Promise<void> | undefined
+
+    constructor(Parent: PRInstance) {
         super();
         this.parent = Parent
         this.running = false
@@ -25,22 +37,20 @@ class ProcessQueue extends Array {
     }
 
     /**
-     * Add a asynchronous promise to the process queue
-     * @param {Promise} callback 
+     * Add a process to the operations queue
      */
-    AddProcess(callback) {
+    public addProcess(callback: Promise<any>) {
         super.push(callback)
 
         if (!this.running) {
-            this.runtime = this.#process()
+            this.runtime = this.process()
         }
     }
 
     /**
      * Get the current runtime of the process queue. Returns a resolve promise if the runtime is not currently active.
-     * @returns {Promise}
      */
-    getRuntime() {
+    public getRuntime():Promise<void> {
         if (this.runtime) {
             return this.runtime
         } else {
@@ -48,17 +58,14 @@ class ProcessQueue extends Array {
         }
     }
 
-    snapshot() {
+    private snapshot(): Array<processQueueTask> {
         return [...this]
     }
 
     /**
-     * @private
      * Start the process queue, it will run till the queue is empty
-     * @param {Boolean} recur
-     * @returns {Promise}
      */
-    #process(recur = false) {
+    private process(recur:boolean = false): Promise<void> | undefined {
         if (!recur && this.running) { //Second instance might be trying to run
             return
         }
@@ -74,7 +81,9 @@ class ProcessQueue extends Array {
     
             while (snapshot.length > 0) { //For all the items in the snapshot, run them one by one
                 let instance = snapshot.shift()
-                await instance(Me.parent);
+                if (instance) {
+                    await instance(Me.parent);
+                }
             }
             
             if (Me.length > 0) { //If new tasks have come in since the task started, recurse back into another pass
@@ -89,19 +98,30 @@ class ProcessQueue extends Array {
     }
 }
 
-export class PRInstance {
-    /**
-     * @type {Object.<string, PRInstance}
-     */
-    static instances = {}
+export default class PRInstance {
 
-    static GetInstance(PRid) {
-        let output = this.instances[PRid]
+    static instances: {[key: string]: PRInstance} = {}
+    assignedPort: number | undefined;
+    process: any;
+    processTimeout: NodeJS.Timeout | undefined;
+
+    static getInstance(PRID: number): PRInstance {
+        let output: PRInstance = this.instances[PRID.toString()]
 
         if (output === undefined) {
-            throw Error(`[GetInstance] ${PRid} has no associated instance!`)
+            throw Error(`[GetInstance] ${PRID} has no associated instance!`)
         } else {
             return output
+        }
+    }
+
+    static checkForInstance(PRID: number): boolean {
+        let output: PRInstance = this.instances[PRID.toString()]
+
+        if (output !== undefined) {
+            return true
+        } else {
+            return false
         }
     }
 
@@ -113,10 +133,8 @@ export class PRInstance {
 
     /**
      * Check if the folder for an instance exists (If an instance exists but is not cached, it implies it was opened before a script reload)
-     * @param {Number|String} PRID
-     * @returns {Boolean} True if exists 
      */
-    static instanceDirExists(PRID) {
+    static instanceDirExists(PRID: number): boolean {
         if (fs.existsSync(`./site_instances/${PRID.toString()}`)) {
             return true
         } else {
@@ -124,18 +142,11 @@ export class PRInstance {
         }
     }
 
-    /** 
-     * @typedef PRInstanceOptions
-     * @property {Number} PRID ID of the Pull Request
-     * @property {String} SourceRepoFullName Full Name of the Repo merging to the project 
-     * @property {String} Branch Branch name of the repo being merged
-     * @property {String} PRRepoAccount Repo account owner of the project
-     * @property {String} PRRepoName Name of the repo the PR is coming from
-     * @property {String} PRAuthor Name of the user merging the PR
-     */
 
-    PortManager: PortManager;
-    options: ;
+
+    Parent: import("../index").Main;
+    options: PRInstanceOptions;
+    processQueue: ProcessQueue
 
     /**
      * 
@@ -143,8 +154,8 @@ export class PRInstance {
      * @param {PRInstanceOptions} options 
      * @returns {PRInstance} Instance registered in memory and can be recalled with the PR ID
      */
-    constructor(PortManager, options) {
-        this.PortManager = PortManager
+    constructor(Parent: import("../index").Main, options: PRInstanceOptions) {
+        this.Parent = Parent
         this.options = options
 
         PRInstance.instances[this.options.PRID] = this
@@ -155,24 +166,19 @@ export class PRInstance {
     }
 
     async download() {
-        this.processQueue.AddProcess(callback)
-
-        /**
-         * 
-         * @param {PRInstance} Me 
-         */
-        function callback(Me) {
-            return new Promise(async function (resolve, reject) {
+        let _this = this
+        this.processQueue.addProcess(
+            new Promise(async function (resolve, reject) {
                 //Check if already exists, if so, stop this and swap to edit
-                if (Me.instanceDirExists()) {
-                    await Me.edit()
-                    resolve()
-    
+                if (_this.instanceDirExists()) {
+                    await _this.edit()
+                    resolve(true)
+
                 } else {
                     try {
-                        await Me.downloadDir()
-                        if (Me.activateJekyll()) {
-                            await Me.comment()
+                        await _this.downloadDir()
+                        if (_this.activateJekyll()) {
+                            await _this.comment()
                         }
                     } catch {
                         //Right now, don't do anything, maybe in the future this will change
@@ -180,76 +186,67 @@ export class PRInstance {
                     } finally {
                         //Want to make sure that regardless of what happens, the promise is fulfilled
 
-                        resolve()
+                        resolve(true)
                     }
                 }
             })
-        }
+        )
     }
 
     async edit() {
-        this.processQueue.AddProcess(callback)
-        
-        /**
-         * 
-         * @param {PRInstance} Me 
-         */
-        function callback(Me) {
-            return new Promise(async function (resolve, reject) {
+        let _this = this
+        this.processQueue.addProcess(
+            new Promise(async function (resolve, reject) {
                 //Start by killing any open instance of this PR
-                Me.killJekyll()
-    
+                _this.killJekyll()
+
                 try {
-                    await Me.deleteDir()
-                    await Me.downloadDir()
-                    if (Me.activateJekyll()) {
-                        await Me.comment("edit")
+                    await _this.deleteDir()
+                    await _this.downloadDir()
+                    if (_this.activateJekyll()) {
+                        await _this.comment("edit")
                     }
                 } catch {
                     //Right now, don't do anything, maybe in the future this will change
 
                 } finally {
-                    resolve()
+                    resolve(true)
                 }
             })
-        }
+        )
     }
 
     async remove(forceRelease = false) {
-        this.processQueue.AddProcess(callback)
-
-        /**
-         * 
-         * @param {PRInstance} Me 
-         */
-        function callback(Me) {
-            return new Promise(async function (resolve, reject) {
-                Me.killJekyll()
+        let _this = this
+        this.processQueue.addProcess(
+            new Promise(async function (resolve, reject) {
+                _this.killJekyll()
                 
                 try {
-                    await Me.deleteDir()
+                    await _this.deleteDir()
 
                     //We should keep track of closed PRs and there is a change it will be reopened immediately (and so it needs to be in the process queue)
                     if (forceRelease) {
                         //Forcefully remove the cache of this Instance
-                        delete PRInstance.instances[Me.options.PRID]
+                        delete PRInstance.instances[_this.options.PRID]
                     }
                 } catch (e) {
                     //Right now, don't do anything, maybe in the future this will change
                 } finally {
-                    resolve()
+                    resolve(true)
                 }
             })
-        }
+        )
+
     }
 
-    async downloadDir() {
+    async downloadDir(): Promise<any> {
         let Me = this
-        return new Promise(function (resolve, reject) {
-            download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `./site_instances/${Me.options.PRID.toString()}`, function(err) {
+        return new Promise(function (resolve, reject)  {
+            download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `./site_instances/${Me.options.PRID.toString()}`, function(err: string) {
                 if (!err) {
                     console.info(`Successfully Downloaded for PR ${Me.options.PRID}`)
-                    resolve()
+                    resolve(true)
                 } else {
                     console.error(`Error Downloading for PR ${Me.options.PRID}: ${err}`)
                     reject(err)
@@ -258,22 +255,22 @@ export class PRInstance {
         })
     }
 
-    deleteDir() {
+    deleteDir(): Promise<true> {
         let Me = this
         return new Promise(function (resolve, reject) {
             if (!Me.instanceDirExists()) {
-                resolve()
+                resolve(true)
             } else {
                 fs.rmdir(`./site_instances/${Me.options.PRID.toString()}`, {"recursive": true}, function() {
                     console.info(`Successfully Deleted Cache for PR ${Me.options.PRID}`)
-                    resolve()
+                    resolve(true)
                 })
             }
         })
 
     }
 
-    instanceDirExists() {
+    instanceDirExists(): boolean {
         if (fs.existsSync(`./site_instances/${this.options.PRID.toString()}`)) {
             return true
         } else {
@@ -290,10 +287,10 @@ export class PRInstance {
 
             //Create a port assignment - Attempt to have the port ID be the same as the PR id, but we can't always have nice things
             try {
-                if (this.PortManager.checkIfAvailable(this.options.PRID + config.minPort)) {
-                    this.assignedPort = this.PortManager.bindManual(this.options.PRID, this)
+                if (this.Parent.PM.checkIfAvailable(this.options.PRID + this.Parent.configData.minPort)) {
+                    this.assignedPort = this.Parent.PM.bindManual(this.options.PRID, this)
                 } else {
-                    this.assignedPort = this.PortManager.bindAuto(this)
+                    this.assignedPort = this.Parent.PM.bindAuto(this)
                 }
             } catch {
                 //Max port probably reached
@@ -301,15 +298,15 @@ export class PRInstance {
             }
 
             console.log(`Activating Jekyll Instance for PR ${this.options.PRID}`)
-            this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP()}`, `--no-watch`], {
+            this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP(this.Parent.configData)}`, `--no-watch`], {
                 cwd: `site_instances/${this.options.PRID}/docs`
             })
 
-            this.process.stdout.on("data", data => {
+            this.process.stdout.on("data", (data: string) => {
                 console.log(`stdout from PR ${Me.options.PRID} jekyll child: ${data}`)
             })
 
-            this.process.on("error", err => {
+            this.process.on("error", (err: string) => {
                 console.error(`Error in Jekyll Instance for PR ${this.options.PRID}: ${err}`)
                 return false
             })
@@ -317,7 +314,7 @@ export class PRInstance {
             //Set a timeout, after this time, close the Jekyll process
             this.processTimeout = setTimeout(function() {
                 Me.killJekyll()
-            }, 1000 * 60 * 60 * config.PR_STALE_TIMEOUT_HOURS /*convert to milliseconds*/)
+            }, 1000 * 60 * 60 * this.Parent.configData.instanceOpenHours /*convert to milliseconds*/)
         }
         return true
     }
@@ -326,16 +323,15 @@ export class PRInstance {
      * 
      * @param {"new"|"edit"} type 
      */
-    comment(type = "new") {
-        let Me = this
+    comment(type = "new"): Promise<any> {
+        let _this = this
         return new Promise(function (resolve, reject) {
-            let string = Comments.createCommentString(Me.options.PRAuthor, config.LinkToDomain, Me.assignedPort, type)
+            let string = Comments.createCommentString(_this.options.PRAuthor, _this.Parent.configData.linkToDomain, _this.assignedPort, type)
             
-    
-            gh.getIssues(Me.options.PRRepoAccount, Me.options.PRRepoName).createIssueComment(Me.options.PRID, string, (comment) => {
+            gh.getIssues(_this.options.PRRepoAccount, _this.options.PRRepoName).createIssueComment(_this.options.PRID, string, (comment: any) => {
                 debugger
-                console.log(`Commented to PR ${Me.options.PRID}`)
-                resolve()
+                console.log(`Commented to PR ${_this.options.PRID}`)
+                resolve(true)
             })
         })
 
@@ -349,9 +345,11 @@ export class PRInstance {
         }
 
         //Incase the kill ran before initial assignment (which can happen if a PR was opened, the script was restarted (cleared from memory), and then closed)
-        if (!this.PortManager.checkIfAvailable(this.assignedPort)) {
-            this.PortManager.release(this.assignedPort)
-            delete this.assignedPort
+        if (this.assignedPort) {
+            if (!this.Parent.PM.checkIfAvailable(this.assignedPort)) {
+                this.Parent.PM.release(this.assignedPort)
+                delete this.assignedPort
+            }
         }
 
         //Make sure to clear timeout as well!
@@ -362,9 +360,9 @@ export class PRInstance {
     }
 }
 
-function getInternalIP() {
-    if (config.InternalIPOverride) {
-        return config.InternalIPOverride
+function getInternalIP(config: import("../index").configurationOptions) {
+    if (config.internalIPOverride) {
+        return config.internalIPOverride
     }
 
 

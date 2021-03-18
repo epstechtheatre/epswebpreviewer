@@ -1,27 +1,28 @@
 // Require express and body-parser
-const express = require("express")
-const bodyParser = require("body-parser")
+import express from "express"
+import bodyParser from "body-parser"
 
-const InstanceManager = require("./managers/InstanceManager.js")
-import PortManager from "./managers/PortManager.js"
-import CommandManager from "./managers/CommandManager.js"
+import InstanceManager from "./managers/InstanceManager.js"
+import PortManager from "./managers/PortManager"
+import CommandManager from "./managers/CommandManager"
+import WebhookManager from "./managers/WebhookManager"
 
 import {
     PullRequestEvent,
     IssueCommentEvent
 } from "@octokit/webhooks-definitions/schema"
 
-interface configurationOptions {
-    "LinkToDomain": string,
-    "InternalIPOverride": string,
-    "Starting_Port": number,
-    "PR_IDLE_WAIT_MS": number,
+export interface configurationOptions {
+    "linkToDomain": string,
+    "internalIPOverride": string,
     "webhookPort": number, 
     "minPort": number,
     "maxPort": number,
     "maxConsecutive"?: number,
-    "PR_STALE_TIMEOUT_HOURS": number
+    "instanceOpenHours": number
 }
+
+const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
 
 /**
  * Main runtime class for all operations, Helps to organize all the stuff
@@ -30,6 +31,8 @@ export class Main {
     configData: configurationOptions;
     CM: CommandManager;
     PM: PortManager;
+
+    webhookManagers: Array<WebhookManager> = []
 
 	/**
 	 * Instantiate Main Class
@@ -42,6 +45,9 @@ export class Main {
 		this.PM = new PortManager(this, configData.minPort, configData.maxPort, configData.maxConsecutive ?? Infinity)
 		this.CM = new CommandManager(this)
 
+        this.webhookManagers.push(new WebhookManager(this, "pull_request", pull_request_callback, PR_DELAY_MS))
+        this.webhookManagers.push(new WebhookManager(this, "issue_comment", issue_comment_callback))
+
 		this.configData = configData
 	}
 
@@ -50,61 +56,40 @@ export class Main {
 		//Initialize Express
 		const app = express()
 		
-		// Tell express to use body-parser's JSON parsing
+		// Tell express to use body-parsers JSON parsing
 		app.use(bodyParser.json())
 
-		app.post("/hook", (req, res) => {
+		app.post("/hook", (req:express.Request, res:express.Response) => {
 			//console.log(req.body) // Call your action on the request here
 			res.status(200).end() // Responding is important
 
-			parseWebhook(req.body)
+			WebhookManager.processIncoming(req)
 		})
 
 
 		// Start express on the defined port
-		app.listen(this.configData.webhookPort, () => console.log(`🚀 Server running on port ${PORT}`))
+		app.listen(this.configData.webhookPort, () => console.log(`🚀 Server running on port ${this.configData.webhookPort}`))
 
-		app.get("/", (req, res) => {
+		app.get("/", (req:express.Request, res:express.Response) => {
 			res.status(200).end()
 		})
 	}
+}
 
-    
-    /**Determine what type of webhook was received (comment or PR)*/
-    parseWebhook(reqBody):void {
-        if (reqBody.issue.pull_request && ["created"].includes(reqBody.action)) { //Is an valid issue comment that is on a PR
-            CM.parse(reqBody)
+function pull_request_callback(Main: Main, reqBody: PullRequestEvent) {
+    if (reqBody.number) {
+        if (!isValidAction(["opened", "reopened", "synchronize", "closed"], reqBody.action)) {
+            return; //We are not listening to the incoming event
         }
 
-        if (reqBody.pull_request.number && ["opened", "reopened", "closed", "synchronize"].includes(reqBody.action)) { //Is a valid PR
-            validatePR(reqBody)
-        }
-    }
+        console.log(`Valid Hook Received!\nType: ${reqBody.action} | Issue: ${reqBody.number}`)
 
-    /**Validate incoming PRs to ensure the webhook needs action*/
-    validatePR(reqBody):void {
-        if (reqBody.number) {
-            if (!["opened", "reopened", "synchronize", "closed"].includes(reqBody.action)) {
-                return;
-            }
-            console.log(`Valid Hook Received!\nType: ${reqBody.action} | Issue: ${reqBody.number}`)
-
-            //If we make it here, it is a valid pull request
-
-            //Lets wait 15 seconds or so before process, just so that zips of the repo are up to date
-            setTimeout(function() {
-                processPRUpdate(reqBody)
-            }, configData.PR_IDLE_WAIT_MS) //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip
-        }
-    }
-
-    /**Process PR updates*/
-    processPRUpdate(reqBody):void {
+        //If we make it here, it is a valid pull request type
 
         //Get the PR information
         let branchName = reqBody.pull_request.head.ref
         let repo = reqBody.pull_request.head.repo.full_name
-        let PRid = reqBody.number
+        let PRID = reqBody.number
         let prRepo = reqBody.repository.name
         let prRepoAuthor = reqBody.repository.owner.login
         let prAuthor = reqBody.sender.login
@@ -114,30 +99,31 @@ export class Main {
             case "opened":
             case "reopened":
                 //Build
-                try {
-                    InstanceManager.GetInstance(PRid).download()
-                } catch (e) {
-                    new InstanceManager(PM, {
+                
+                //Try to use an existing instance, but if it doesn't exist, then create a new one
+                if (InstanceManager.checkForInstance(PRID)) {
+                    InstanceManager.getInstance(PRID).download()
+                } else {
+                    new InstanceManager(Main, {
                         "Branch": branchName,
                         "SourceRepoFullName": repo,
-                        "PRID": PRid,
+                        "PRID": PRID,
                         "PRRepoAccount": prRepoAuthor,
                         "PRRepoName": prRepo,
                         "PRAuthor": prAuthor
-
                     }).download()
                 }
-
                 break;
 
             case "synchronize": //Fancy term for "more commits added"
                 //Kill, and rebuild
-                try {
-                    InstanceManager.GetInstance(PRid).edit()
-                } catch (e) {
-                    new InstanceManager(PM, {
+
+                if (InstanceManager.checkForInstance(PRID)) {
+                    InstanceManager.getInstance(PRID).edit()
+                } else {
+                    new InstanceManager(Main, {
                         "Branch": branchName,
-                        "PRID": PRid,
+                        "PRID": PRID,
                         "SourceRepoFullName": repo,
                         "PRRepoAccount": prRepoAuthor,
                         "PRRepoName": prRepo,
@@ -148,12 +134,13 @@ export class Main {
 
             case "closed":
                 //Kill and close
-                try {
-                    InstanceManager.GetInstance(PRid).remove()
-                } catch (e) {
-                    new InstanceManager(PM, {
+
+                if (InstanceManager.checkForInstance(PRID)) {
+                    InstanceManager.getInstance(PRID).remove()
+                } else {
+                    new InstanceManager(Main, {
                         "Branch": branchName,
-                        "PRID": PRid,
+                        "PRID": PRID,
                         "SourceRepoFullName": repo,
                         "PRRepoAccount": prRepoAuthor,
                         "PRRepoName": prRepo,
@@ -161,12 +148,21 @@ export class Main {
                     }).remove()
                 }
                 break;
-
-            default:
-                console.log(`Unsupported PR Action type: ${reqBody.action}`)
-                //Best to just leave it for now
-                break;
         }
+    }
+}
+
+function issue_comment_callback(Main: Main, reqBody: IssueCommentEvent) {
+    if (!isValidAction(["created"], reqBody.action)) {
+        return //We are not listening to the incoming event
+    }
+}
+
+function isValidAction(allowedActions: Array<string>, incomingAction:string) {
+    if (allowedActions.includes(incomingAction)) {
+        return true
+    } else {
+        return false
     }
 }
 

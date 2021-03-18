@@ -50,8 +50,38 @@
                 "additionalProperties": false
             },
             "fileMatch": [
-                "/**/*config.json"
+                "/**/*config.json",
+                "!tsconfig.json",
+                "!jsconfig.json"
+            ]
+        },
+        {
+            "schema": {
+                "title": "Auth Options",
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "description": "Github account auth token"
+                    },
+                    "webhookSecret": {
+                        "type": "string",
+                        "description": "Secret for webhook authentication"
+                    },
+                },
+                "required": [
+                    "token",
+                    "webhookSecret"
+                ],
+                "additionalProperties": false
+            },
+            "fileMatch": [
+                "/**/*auth.json"
             ]
         }
+    ],
+    "cSpell.words": [
+        "PRID",
+        "octokit"
     ]
 }

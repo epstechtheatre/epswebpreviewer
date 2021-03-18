@@ -1,7 +1,7 @@
 //Manage comments sent out to PR threads
 const Github = require("github-api");
 
-class CommentManager {
+export default class CommentManager {
     constructor(authToken) {
         this.login = authToken
 

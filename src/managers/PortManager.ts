@@ -1,7 +1,7 @@
 /**
  * A helper class to manage port assignment for Jekyll instances. This doesn't actually create the Jekyll server, it just organized what ports are in use.
  */
-export class PortManager {
+export default class PortManager {
     Parent: import("../index").Main
     minPort: number
     maxPort: number
@@ -33,24 +33,24 @@ export class PortManager {
 
     /**
      * An object of bound ports and what they are bound to
-     * @type {Object.<number, any>}
      */
-    assignments = {}
+    assignments: {[key: number]: any} = {}
 
     /**
      * Check if a given port number is outside of the range of allowed ports
      */
-    checkInRange(portNumber: number) {
+    checkInRange(portNumber: number): boolean {
         if (portNumber > this.maxPort || portNumber < this.minPort) {
-            return portNumber
+            return false
+        } else {
+            return true
         }
     }
 
     /**
      * Check if a given port number is in use by another instance. 
-     * @returns {Boolean} true if port is unassigned, false otherwise or if out of range
      */
-    checkIfAvailable(portNumber: number) {
+    checkIfAvailable(portNumber: number): boolean {
         if (this.checkInRange(portNumber)) {
             return (this.assignments[portNumber] === undefined)
         } else {
@@ -70,7 +70,7 @@ export class PortManager {
      * @returns {Boolean} true if under maximum
      */
     underMaxConsecutive() {
-        if (Object.keys(this.BoundTo).length >= this.maxConsecutive) {
+        if (Object.keys(this.assignments).length >= this.maxConsecutive) {
             return false
         } else {
             return true
@@ -82,7 +82,7 @@ export class PortManager {
      * @param {*} ToBind What is using the port
      * @returns {Number} The port the Instance was bound to. Throws error if all ports in use
      */
-    bindAuto(ToBind) {
+    bindAuto(ToBind: any): number {
         if (!this.underMaxConsecutive()) {
             throw Error("[bindAuto] Max consecutive assignments reached! Release stale instances before binding more ports.")
         }
@@ -102,10 +102,8 @@ export class PortManager {
 
     /**
      * Manual assign a port ID and a binding.
-     * @param {*} ToBind What is using the port
-     * @returns {Number} The bound port number. Throws Error if port in use, or if max consecutive ports is reached
      */
-    bindManual(portNumber: number, ToBind) {
+    bindManual(portNumber: number, ToBind: any): number {
         if (!this.underMaxConsecutive()) {
             throw Error("[bindAuto] Max consecutive assignments reached! Release stale instances before binding more ports.")
         }
@@ -117,7 +115,7 @@ export class PortManager {
         if (this.checkIfAvailable(portNumber)) {
             this.assignments[portNumber] = ToBind
 
-            return true
+            return portNumber
         } else {
             throw Error("[bindManual] Requested port is in use!")
         }
