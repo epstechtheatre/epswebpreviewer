@@ -7,12 +7,9 @@ import PortManager from "./managers/PortManager.js"
 import CommandManager from "./managers/CommandManager.js"
 
 import {
-    
+    PullRequestEvent,
+    IssueCommentEvent
 } from "@octokit/webhooks-definitions/schema"
-
-/**
- * Main runtime class for all operations, Helps to organize all the stuff
- */
 
 interface configurationOptions {
     "LinkToDomain": string,
@@ -26,6 +23,9 @@ interface configurationOptions {
     "PR_STALE_TIMEOUT_HOURS": number
 }
 
+/**
+ * Main runtime class for all operations, Helps to organize all the stuff
+ */
 export class Main {
     configData: configurationOptions;
     CM: CommandManager;

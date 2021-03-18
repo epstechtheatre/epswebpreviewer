@@ -1,0 +1,57 @@
+{
+    "json.schemas": [
+        {
+            "schema": {
+                "title": "Configuration Options",
+                "type": "object",
+                "properties": {
+                    "linkToDomain": {
+                        "type": "string",
+                        "description": "The public domain that generated sites will point to. This is only used in comment url link generation."
+                    },
+                    "internalIPOverride": {
+                        "type": "string",
+                        "description": "Override the Private IP the script uses. On startup, the script will try to automatically detect what this IP is but can be explicitly set here.",
+                        "format": "ip-address"
+                    },
+                    "maxConsecutive": {
+                        "type": "integer",
+                        "description": "The maximum number of consecutive preview instances allowed to be open at 1 time. Set to 0 for no limit. Max 1000 (though I STRONGLY suggest you don't use that)",
+                        "default": 10,
+                        "minimum": 0,
+                        "maximum": 1000
+                    },
+                    "minPort": {
+                        "type": "integer",
+                        "description": "The start of the port range to open web previews on.",
+                        "minimum": 0,
+                        "maximum": 65535
+                    },
+                    "maxPort": {
+                        "type": "integer",
+                        "description": "The end of the port range to open web previews on. Must be greater than the min port",
+                        "maximum": 65535,
+                        "minimum": 0
+                    },
+                    "instanceOpenHours": {
+                        "type": "integer",
+                        "description": "The number of hours to keep instances open",
+                        "default": 6,
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "linkToDomain",
+                    "minPort",
+                    "maxPort",
+                    "maxConsecutive",
+                    "instanceOpenHours"
+                ],
+                "additionalProperties": false
+            },
+            "fileMatch": [
+                "/**/*config.json"
+            ]
+        }
+    ]
+}

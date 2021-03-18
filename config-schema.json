@@ -1,8 +1,0 @@
-"json.schemas": [
-    {
-        "fileMatch": [
-            "/config.json"
-        ],
-        "url": "./meta/config.template.json"
-    }
-]

@@ -1,0 +1,7 @@
+{
+    "linkToDomain": "http://epswebpreview.westus2.cloudapp.azure.com",
+    "maxConsecutive": 5,
+    "minPort": 40000,
+    "maxPort": 50000,
+    "instanceOpenHours": 1
+}

@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/epstechtheatre/epswebpreviewer#readme",
   "dependencies": {
+    "@octokit/webhooks-definitions": "^3.62.6",
     "body-parser": "^1.19.0",
     "download-git-repo": "^3.0.2",
     "express": "^4.17.1",

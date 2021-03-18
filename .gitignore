@@ -2,3 +2,4 @@ node_modules/*
 site_instances/*
 auth.json
 config.json
+local.config.json
