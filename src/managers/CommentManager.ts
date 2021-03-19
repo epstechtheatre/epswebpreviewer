@@ -1,3 +1,5 @@
+import { PRInstanceOptions } from "./InstanceManager";
+
 //Manage comments sent out to PR threads
 const Github = require("github-api");
 export default class CommentManager {
@@ -15,21 +17,21 @@ export default class CommentManager {
     getBotLogin(): Promise<string> {
         let _this = this
         return new Promise(async function (resolve, reject) {
-            let MyLogin = _this.gh.getUser()
+            let Me = _this.gh.getUser() //No params defaults to login user
 
             //TODO: Something
 
-            resolve(MyLogin)
+            resolve(Me)
 
         })
     }
 
-    SendComment(text: string, PRID: number, useFancify: boolean) {
+    SendComment(options: PRInstanceOptions, commentString: string, useFancify: boolean): Promise<boolean> {
         let _this = this
         return new Promise(async function (resolve, reject) {
-            _this.gh.getIssues(_this.options.PRRepoAccount, _this.options.PRRepoName).createIssueComment(_this.options.PRID, string, (comment: any) => {
+            _this.gh.getIssues(options.PRRepoAccount, options.PRRepoName).createIssueComment(options.PRID, commentString, (comment: any) => {
                 debugger
-                console.log(`Commented to PR ${_this.options.PRID}`)
+                console.log(`Commented to PR ${options.PRID}`)
                 resolve(true)
             })
         })
@@ -40,7 +42,7 @@ export default class CommentManager {
      * @param {String} PRAuthor The name of the author of the PR (used for personalized messages)
      * @param {"new"|"edit"} type What type of comment should be sent out
      */
-    static createCommentString(PRAuthor: string, linkDomain: string, assignedPort: string, openTime: number, type: "newServerFull" | "edit" | "new") {
+    static createCommentString(PRAuthor: string, linkDomain: string, assignedPort: number, openTime: number, type: "newServerFull" | "edit" | "new") {
         let comment = "";
         switch (type) {
             case "new": {
@@ -76,9 +78,8 @@ export default class CommentManager {
 
     /**
      * I take in nice javascript text and turn it into mangled markdown text (no tabs at the start of lines)
-     * @param {String} text
      */
-    static fancify(text) {
+    static fancify(text: string) {
         return text.replace(/^\s*/gmi, "") //Remove all spaces at the start of a line
     }
 }

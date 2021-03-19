@@ -1,7 +1,10 @@
 {
     "linkToDomain": "http://epswebpreview.westus2.cloudapp.azure.com",
-    "maxConsecutive": 5,
-    "minPort": 40000,
-    "maxPort": 50000,
-    "instanceOpenHours": 1
+    "webhookPort": 22,
+    "instanceOpenHours": 1,
+    "internalIPOverride": "127.0.0.2",
+    "maxConsecutive": 1000,
+    "maxPort": 22,
+    "minPort": 22
+
 }

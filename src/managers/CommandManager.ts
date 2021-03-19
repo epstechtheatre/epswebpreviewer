@@ -1,9 +1,6 @@
 import { IssueCommentEvent } from "@octokit/webhooks-definitions/schema"
 
 //The file parses every comment detected to check if it contains a command.
-const InstanceManager = require("./InstanceManager.js")
-const PortManager = require("./PortManager.js")
-
 
 export default class CommandManager {
 
@@ -19,7 +16,7 @@ export default class CommandManager {
     }
 
     /**
-     * Parse a potential command. If the command is valid and the commenter is the author of the PR/a member of the review team, then run the command's callback
+     * Parse a potential command. If the command is valid and the commenter is the author of the PR, then run the command's callback
      */
     parse(ReqBody: IssueCommentEvent) {
         let commentBody = ReqBody.comment.body
@@ -37,20 +34,14 @@ export default class CommandManager {
 
                 //otherwise we can run it
 
-                CommandManager.Commands[possibleKeyword].checkMe()
+                CommandManager.Commands[possibleKeyword].Command.checkMe(commentBody)
 
             }
         }
     }
 
-    /**
-     * Called from the Command Class
-     * @param {String} keyword Will toLowerCase() when called
-     * @param {Command} Command
-     * @param {Boolean} requireAuthor 
-     */
-    static registerCommand(keyword, Command, requireAuthor) {
-        this.Commands[keyword.toLowerCase()] = { "Command": Command, "requireAuthor": requireAuthor}
+    static registerCommand(Command: Command) {
+        this.Commands[Command.keyword.toLowerCase()] = { "Command": Command, "requireAuthor": Command.requireAuthor}
     }
 }
 
@@ -58,56 +49,50 @@ export default class CommandManager {
  * Very barebone command parser for github PR comments
  */
 class Command {
-    /**
-     * @callback CommandFunction
-     * @param {String} commenter
-     * @param {Number} PRID
-     */
+    keyword: string
+    callback: CommandFunction
+    requireAuthor: boolean
 
-    /**
-     * 
-     * @param {String} keyword 
-     * @param {CommandFunction} callback
-     * @param {Boolean} [requireAuthor=true]
-     */
-    constructor(keyword, callback, requireAuthor = true) {
+    constructor(keyword: string, callback: CommandFunction, requireAuthor: boolean = true) {
         this.keyword = keyword
         this.callback = callback
         this.requireAuthor = requireAuthor
 
-        CommandManager.registerCommand(this.requireAuthor)
+        CommandManager.registerCommand(this)
         return this
     }
 
-    /**
-     * 
-     * @param {String} entered 
-     */
-    checkMe(entered) {
+    checkMe(enteredCommand: string) {
         
     }
 }
 
+interface CommandFunction {
+    comment: string
+    commenter: string
+    PRID: number
+}
+
 //Because there is so few commands, I'm just going to write them all in this one file. If this expands, it should probably get a directory
 
-/** @type {CommandFunction} */
-function callback_listCommands(comment, commenter, PRID) {
+var callback_listCommands: CommandFunction 
+callback_listCommands = (comment: string, commenter: string, PRID: number) => {
     //List the four commands that can be run. If the commenter is not the PR author, prepend the message saying they can't run commands in this PR
 }
 
-/** @type {CommandFunction} */
-function callback_requestPreview(comment, commenter, PRID) {
+var callback_requestPreview: CommandFunction
+callback_requestPreview = (comment: string, commenter: string, PRID: number) => {
     //Check if the instance is running. If false, start a preview instance
 
 }
 
-/** @type {CommandFunction} */
-function callback_destroyPreview(comment, commenter, PRID) {
+var callback_destroyPreview: CommandFunction 
+callback_destroyPreview = (comment: string, commenter: string, PRID: number) => {
     //Check if the instance is running. If true, destroy the instance
 }
 
-/** @type {CommandFunction} */
-function callback_status(comment, commenter, PRID) {
+var callback_status: CommandFunction 
+callback_status = (comment: string, commenter: string, PRID: number) => {
     //Check if the preview for the instance is running (this is simple, just need to check if the PRID instance process exists)
 }
 

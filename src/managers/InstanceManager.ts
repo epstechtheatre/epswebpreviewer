@@ -9,7 +9,7 @@ import fs from "fs"
 import {spawn} from "child_process"
 import Comments from "./CommentManager.js"
 const gh = require("github-api")
-interface PRInstanceOptions {
+export interface PRInstanceOptions {
     PRID: number
     SourceRepoFullName: string
     Branch: string
@@ -287,10 +287,10 @@ export default class PRInstance {
 
             //Create a port assignment - Attempt to have the port ID be the same as the PR id, but we can't always have nice things
             try {
-                if (this.Parent.PM.checkIfAvailable(this.options.PRID + this.Parent.configData.minPort)) {
-                    this.assignedPort = this.Parent.PM.bindManual(this.options.PRID, this)
+                if (this.Parent.PortManager.checkIfAvailable(this.options.PRID + this.Parent.configData.minPort)) {
+                    this.assignedPort = this.Parent.PortManager.bindManual(this.options.PRID, this)
                 } else {
-                    this.assignedPort = this.Parent.PM.bindAuto(this)
+                    this.assignedPort = this.Parent.PortManager.bindAuto(this)
                 }
             } catch {
                 //Max port probably reached
@@ -319,20 +319,16 @@ export default class PRInstance {
         return true
     }
 
-    /**
-     * 
-     * @param {"new"|"edit"} type 
-     */
-    comment(type = "new"): Promise<any> {
+    comment(type: "new"|"edit" = "new"): Promise<any> {
         let _this = this
         return new Promise(function (resolve, reject) {
-            let string = Comments.createCommentString(_this.options.PRAuthor, _this.Parent.configData.linkToDomain, _this.assignedPort, type)
-            
-            gh.getIssues(_this.options.PRRepoAccount, _this.options.PRRepoName).createIssueComment(_this.options.PRID, string, (comment: any) => {
-                debugger
-                console.log(`Commented to PR ${_this.options.PRID}`)
-                resolve(true)
-            })
+            if (_this.assignedPort) {
+                let commentString = Comments.createCommentString(_this.options.PRAuthor, _this.Parent.configData.linkToDomain, _this.assignedPort, _this.Parent.configData.instanceOpenHours, type)
+
+                _this.Parent.CommentManager.SendComment(_this.options, commentString, true).then(() => {
+                    resolve(true)
+                })
+            }
         })
 
     }
@@ -346,8 +342,8 @@ export default class PRInstance {
 
         //Incase the kill ran before initial assignment (which can happen if a PR was opened, the script was restarted (cleared from memory), and then closed)
         if (this.assignedPort) {
-            if (!this.Parent.PM.checkIfAvailable(this.assignedPort)) {
-                this.Parent.PM.release(this.assignedPort)
+            if (!this.Parent.PortManager.checkIfAvailable(this.assignedPort)) {
+                this.Parent.PortManager.release(this.assignedPort)
                 delete this.assignedPort
             }
         }

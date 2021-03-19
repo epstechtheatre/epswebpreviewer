@@ -7,8 +7,7 @@
                 "properties": {
                     "linkToDomain": {
                         "type": "string",
-                        "description": "The public domain that generated sites will point to. This is only used in comment url link generation.",
-                        "pattern": "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])$"
+                        "description": "The public domain that generated sites will point to. This is only used in comment url link generation."
         
                     },
                     "internalIPOverride": {
@@ -47,11 +46,6 @@
                         "default": 9193,
                         "minimum": 1,
                         "maximum": 65535
-                    },
-                    "lang": {
-                        "type": "string",
-                        "default": "english",
-                        "description": "The language comments are sent in",
                     }
                 },
                 "required": [

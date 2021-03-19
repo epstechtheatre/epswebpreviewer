@@ -11,6 +11,7 @@ import {
     PullRequestEvent,
     IssueCommentEvent
 } from "@octokit/webhooks-definitions/schema"
+import CommentManager from "./managers/CommentManager.js"
 
 export interface configurationOptions {
     "linkToDomain": string,
@@ -26,6 +27,7 @@ export interface authData {
     "githubToken": string,
     "webhookSecret": string
 }
+
 const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
 
 /**
@@ -33,11 +35,12 @@ const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or 
  */
 export class Main {
     configData: configurationOptions;
-    CM: CommandManager;
-    PM: PortManager;
+    CommandManager: CommandManager;
+    PortManager: PortManager;
     authData: authData;
-
-    webhookManagers: Array<WebhookManager> = []
+    WebhookManager: WebhookManager
+    CommentManager: CommentManager
+    botLogin: string | undefined
 
 	/**
 	 * Instantiate Main Class
@@ -47,15 +50,28 @@ export class Main {
 		InstanceManager.prepSiteDirectory()
 
 		//Instantiate all required managers
-		this.PM = new PortManager(this, configData.minPort, configData.maxPort, configData.maxConsecutive ?? Infinity)
-		this.CM = new CommandManager(this)
+		this.PortManager = new PortManager(this, configData.minPort, configData.maxPort, configData.maxConsecutive ?? Infinity)
+		this.CommandManager = new CommandManager(this)
 
-        this.webhookManagers.push(new WebhookManager(this, "pull_request", pull_request_callback, PR_DELAY_MS))
-        this.webhookManagers.push(new WebhookManager(this, "issue_comment", issue_comment_callback))
+        this.WebhookManager = new WebhookManager(this)
+        this.CommentManager = new CommentManager(this)
+
+        this.WebhookManager.addListener("pull_request", pull_request_callback, PR_DELAY_MS)
+        this.WebhookManager.addListener("issue_comment", issue_comment_callback)
 
 		this.configData = configData
         this.authData = authData
 	}
+
+    getGithubLogin(): Promise<Main> {
+        let _this = this
+        return new Promise(function (resolve, reject) {
+            _this.CommentManager.getBotLogin().then((login) => {
+                _this.botLogin = login
+                resolve(_this)
+            })
+        })
+    }
 
 	createWebhookServer() {
 
@@ -66,10 +82,11 @@ export class Main {
 		app.use(bodyParser.json())
 
 		app.post("/hook", (req:express.Request, res:express.Response) => {
-			//console.log(req.body) // Call your action on the request here
+			//console.log(req.body)
+            
 			res.status(200).end() // Responding is important
 
-			WebhookManager.processIncoming(req)
+			this.WebhookManager.checkIncoming(req)
 		})
 
 
@@ -173,3 +190,7 @@ function isValidAction(allowedActions: Array<string>, incomingAction:string) {
 }
 
 new Main(require("./config.json"), require("./auth.json"))
+.getGithubLogin()
+.then((Main) => {
+    Main.createWebhookServer()
+})
