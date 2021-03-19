@@ -1,4 +1,3 @@
-import {webhookSecret} from "../../auth.json"
 import crypto from "crypto"
 import express from "express"
 
@@ -63,7 +62,7 @@ export default class WebhookListener {
 
     private validateSHA(req: express.Request): boolean {
         //Using our copy of the secret, let's create a hash and see if the results line up
-        const expectedSignature = `sha256=${crypto.createHmac("sha256", webhookSecret).update(JSON.stringify(req.body)).digest("hex")}` 
+        const expectedSignature = `sha256=${crypto.createHmac("sha256", this.Parent.authData.webhookSecret).update(JSON.stringify(req.body)).digest("hex")}` 
 
         if (req.headers["x-hub-signature-256"] === expectedSignature) {
             //Great we can proceed

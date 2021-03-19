@@ -7,12 +7,14 @@
                 "properties": {
                     "linkToDomain": {
                         "type": "string",
-                        "description": "The public domain that generated sites will point to. This is only used in comment url link generation."
+                        "description": "The public domain that generated sites will point to. This is only used in comment url link generation.",
+                        "pattern": "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])$"
+        
                     },
                     "internalIPOverride": {
                         "type": "string",
                         "description": "Override the Private IP the script uses. On startup, the script will try to automatically detect what this IP is but can be explicitly set here.",
-                        "format": "ip-address"
+                        "pattern": "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.|$)){4}$"
                     },
                     "maxConsecutive": {
                         "type": "integer",
@@ -38,6 +40,18 @@
                         "description": "The number of hours to keep instances open",
                         "default": 6,
                         "minimum": 1
+                    },
+                    "webhookPort": {
+                        "type": "integer",
+                        "description": "The port for incoming webhook requests",
+                        "default": 9193,
+                        "minimum": 1,
+                        "maximum": 65535
+                    },
+                    "lang": {
+                        "type": "string",
+                        "default": "english",
+                        "description": "The language comments are sent in",
                     }
                 },
                 "required": [
@@ -45,7 +59,9 @@
                     "minPort",
                     "maxPort",
                     "maxConsecutive",
-                    "instanceOpenHours"
+                    "instanceOpenHours",
+                    "webhookPort",
+                    "lang"
                 ],
                 "additionalProperties": false
             },
@@ -60,7 +76,7 @@
                 "title": "Auth Options",
                 "type": "object",
                 "properties": {
-                    "token": {
+                    "githubToken": {
                         "type": "string",
                         "description": "Github account auth token"
                     },
@@ -70,7 +86,7 @@
                     },
                 },
                 "required": [
-                    "token",
+                    "githubToken",
                     "webhookSecret"
                 ],
                 "additionalProperties": false

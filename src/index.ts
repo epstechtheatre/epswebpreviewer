@@ -22,6 +22,10 @@ export interface configurationOptions {
     "instanceOpenHours": number
 }
 
+export interface authData {
+    "githubToken": string,
+    "webhookSecret": string
+}
 const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
 
 /**
@@ -31,13 +35,14 @@ export class Main {
     configData: configurationOptions;
     CM: CommandManager;
     PM: PortManager;
+    authData: authData;
 
     webhookManagers: Array<WebhookManager> = []
 
 	/**
 	 * Instantiate Main Class
 	 */
-	constructor(configData: configurationOptions) {
+	constructor(configData: configurationOptions, authData: authData) {
 		//Ensure ./site_instances exists
 		InstanceManager.prepSiteDirectory()
 
@@ -49,6 +54,7 @@ export class Main {
         this.webhookManagers.push(new WebhookManager(this, "issue_comment", issue_comment_callback))
 
 		this.configData = configData
+        this.authData = authData
 	}
 
 	createWebhookServer() {
@@ -166,4 +172,4 @@ function isValidAction(allowedActions: Array<string>, incomingAction:string) {
     }
 }
 
-new Main(require("./config.json"))
+new Main(require("./config.json"), require("./auth.json"))
