@@ -5,7 +5,7 @@ import bodyParser from "body-parser"
 import InstanceManager from "./managers/InstanceManager.js"
 import PortManager from "./managers/PortManager"
 import CommandManager from "./managers/CommandManager"
-import WebhookManager from "./managers/WebhookManager"
+import WebhookManager, { WebhookCallback } from "./managers/WebhookManager"
 
 import {
     PullRequestEvent,
@@ -27,8 +27,6 @@ export interface authData {
     "githubToken": string,
     "webhookSecret": string
 }
-
-const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
 
 /**
  * Main runtime class for all operations, Helps to organize all the stuff
@@ -56,12 +54,16 @@ export class Main {
         this.WebhookManager = new WebhookManager(this)
         this.CommentManager = new CommentManager(this)
 
-        this.WebhookManager.addListener("pull_request", pull_request_callback, PR_DELAY_MS)
-        this.WebhookManager.addListener("issue_comment", issue_comment_callback)
-
 		this.configData = configData
         this.authData = authData
 	}
+
+    registerBodyTypeCallback(eventName: string, CB: WebhookCallback, delay: number = 0) {
+        
+        this.WebhookManager.addListener(eventName, CB, delay)
+
+        return this
+    }
 
     getGithubLogin(): Promise<Main> {
         let _this = this
@@ -98,8 +100,15 @@ export class Main {
 		})
 	}
 }
+class bodyTypeCallback {
+    function: WebhookCallback
 
-function pull_request_callback(Main: Main, reqBody: PullRequestEvent) {
+    constructor(callback: WebhookCallback) {
+        this.function = callback
+    }
+}
+
+const PR_CB = new bodyTypeCallback((Main: Main, reqBody: PullRequestEvent) => {
     if (reqBody.number) {
         if (!isValidAction(["opened", "reopened", "synchronize", "closed"], reqBody.action)) {
             return; //We are not listening to the incoming event
@@ -173,13 +182,13 @@ function pull_request_callback(Main: Main, reqBody: PullRequestEvent) {
                 break;
         }
     }
-}
+})
 
-function issue_comment_callback(Main: Main, reqBody: IssueCommentEvent) {
+const IC_CB = new bodyTypeCallback((Main: Main, reqBody: IssueCommentEvent) => {
     if (!isValidAction(["created"], reqBody.action)) {
         return //We are not listening to the incoming event
     }
-}
+})
 
 function isValidAction(allowedActions: Array<string>, incomingAction:string) {
     if (allowedActions.includes(incomingAction)) {
@@ -189,8 +198,11 @@ function isValidAction(allowedActions: Array<string>, incomingAction:string) {
     }
 }
 
+const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
+
 new Main(require("./config.json"), require("./auth.json"))
-.getGithubLogin()
-.then((Main) => {
+.registerBodyTypeCallback("issue_comment", IC_CB.function)
+.registerBodyTypeCallback("pull_request", PR_CB.function, PR_DELAY_MS)
+.getGithubLogin().then((Main) => {
     Main.createWebhookServer()
 })

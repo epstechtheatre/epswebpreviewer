@@ -5,7 +5,7 @@ type registeredListeners = {
     [key: string]: WebhookListener
 }
 
-interface WebhookCallback { (Main: import("../index").Main, reqBody: express.Request["body"]): void }
+export interface WebhookCallback { (Main: import("../index").Main, reqBody: express.Request["body"]): void }
 export default class WebhookManager {
     registeredListeners: registeredListeners = {}
     Parent: import("../index").Main

@@ -7,7 +7,6 @@ export default class PortManager {
     maxPort: number
     maxConsecutive: number
 
-
     constructor(Parent: import("../index").Main, minPort: number, maxPort: number, maxConsecutive:number = Infinity) {
         if (isNaN(minPort) || isNaN(maxPort) || isNaN(maxConsecutive)) {
             throw Error("[PortManager] non-number provided!")

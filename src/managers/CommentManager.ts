@@ -42,7 +42,7 @@ export default class CommentManager {
      * @param {String} PRAuthor The name of the author of the PR (used for personalized messages)
      * @param {"new"|"edit"} type What type of comment should be sent out
      */
-    static createCommentString(PRAuthor: string, linkDomain: string, assignedPort: number, openTime: number, type: "newServerFull" | "edit" | "new") {
+    static createTemplateCommentString(PRAuthor: string, linkDomain: string, assignedPort: number, openTime: number, type: "newServerNoResources" | "edit" | "new") {
         let comment = "";
         switch (type) {
             case "new": {
@@ -63,7 +63,7 @@ export default class CommentManager {
                 break;
             }
 
-            case "newServerFull": {
+            case "newServerNoResources": {
                 comment = `Hey there, @${PRAuthor}!
                 There's a lot of traffic right now so I wasn't able to create a website preview.
                 If you need a preview. Come back in a couple hours, mention me at the start of a comment and type 'create'`

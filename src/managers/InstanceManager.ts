@@ -8,7 +8,6 @@ const download_repo_git = require("download-git-repo")
 import fs from "fs"
 import {spawn} from "child_process"
 import Comments from "./CommentManager.js"
-const gh = require("github-api")
 export interface PRInstanceOptions {
     PRID: number
     SourceRepoFullName: string
@@ -101,7 +100,7 @@ class ProcessQueue extends Array {
 export default class PRInstance {
 
     static instances: {[key: string]: PRInstance} = {}
-    assignedPort: number | undefined;
+    assignedPort: number = 0; //Initially assigned 0 but this will change before a server is opened
     process: any;
     processTimeout: NodeJS.Timeout | undefined;
 
@@ -142,23 +141,21 @@ export default class PRInstance {
         }
     }
 
-
-
     Parent: import("../index").Main;
-    options: PRInstanceOptions;
+    webhookData: PRInstanceOptions;
     processQueue: ProcessQueue
 
     /**
      * 
      * @param {PortManager} PortManager
-     * @param {PRInstanceOptions} options 
+     * @param {PRInstanceOptions} webhookData 
      * @returns {PRInstance} Instance registered in memory and can be recalled with the PR ID
      */
-    constructor(Parent: import("../index").Main, options: PRInstanceOptions) {
+    constructor(Parent: import("../index").Main, webhookData: PRInstanceOptions) {
         this.Parent = Parent
-        this.options = options
+        this.webhookData = webhookData
 
-        PRInstance.instances[this.options.PRID] = this
+        PRInstance.instances[this.webhookData.PRID] = this
 
         this.processQueue = new ProcessQueue(this)
 
@@ -178,7 +175,9 @@ export default class PRInstance {
                     try {
                         await _this.downloadDir()
                         if (_this.activateJekyll()) {
-                            await _this.comment()
+                            await _this.comment("newServerNoResources")
+                        } else {
+
                         }
                     } catch {
                         //Right now, don't do anything, maybe in the future this will change
@@ -205,6 +204,8 @@ export default class PRInstance {
                     await _this.downloadDir()
                     if (_this.activateJekyll()) {
                         await _this.comment("edit")
+                    } else {
+                        await _this.comment("editFailed")
                     }
                 } catch {
                     //Right now, don't do anything, maybe in the future this will change
@@ -228,7 +229,7 @@ export default class PRInstance {
                     //We should keep track of closed PRs and there is a change it will be reopened immediately (and so it needs to be in the process queue)
                     if (forceRelease) {
                         //Forcefully remove the cache of this Instance
-                        delete PRInstance.instances[_this.options.PRID]
+                        delete PRInstance.instances[_this.webhookData.PRID]
                     }
                 } catch (e) {
                     //Right now, don't do anything, maybe in the future this will change
@@ -243,12 +244,12 @@ export default class PRInstance {
     async downloadDir(): Promise<any> {
         let Me = this
         return new Promise(function (resolve, reject)  {
-            download_repo_git(`direct:https://github.com/${Me.options.SourceRepoFullName}/archive/${Me.options.Branch}.zip`, `./site_instances/${Me.options.PRID.toString()}`, function(err: string) {
+            download_repo_git(`direct:https://github.com/${Me.webhookData.SourceRepoFullName}/archive/${Me.webhookData.Branch}.zip`, `./site_instances/${Me.webhookData.PRID.toString()}`, function(err: string) {
                 if (!err) {
-                    console.info(`Successfully Downloaded for PR ${Me.options.PRID}`)
+                    console.info(`Successfully Downloaded for PR ${Me.webhookData.PRID}`)
                     resolve(true)
                 } else {
-                    console.error(`Error Downloading for PR ${Me.options.PRID}: ${err}`)
+                    console.error(`Error Downloading for PR ${Me.webhookData.PRID}: ${err}`)
                     reject(err)
                 }
             })
@@ -261,8 +262,8 @@ export default class PRInstance {
             if (!Me.instanceDirExists()) {
                 resolve(true)
             } else {
-                fs.rmdir(`./site_instances/${Me.options.PRID.toString()}`, {"recursive": true}, function() {
-                    console.info(`Successfully Deleted Cache for PR ${Me.options.PRID}`)
+                fs.rmdir(`./site_instances/${Me.webhookData.PRID.toString()}`, {"recursive": true}, function() {
+                    console.info(`Successfully Deleted Cache for PR ${Me.webhookData.PRID}`)
                     resolve(true)
                 })
             }
@@ -271,7 +272,7 @@ export default class PRInstance {
     }
 
     instanceDirExists(): boolean {
-        if (fs.existsSync(`./site_instances/${this.options.PRID.toString()}`)) {
+        if (fs.existsSync(`./site_instances/${this.webhookData.PRID.toString()}`)) {
             return true
         } else {
             return false
@@ -279,53 +280,56 @@ export default class PRInstance {
     }
 
     activateJekyll() {
-        if (!fs.existsSync(`./site_instances/${this.options.PRID.toString()}/docs`)) {
-            console.error(`[activateJekyll] malformed instance for PR ${this.options.PRID}! Skipping...`)
+        if (!fs.existsSync(`./site_instances/${this.webhookData.PRID.toString()}/docs`)) {
+            console.error(`[activateJekyll] malformed instance for PR ${this.webhookData.PRID}! Skipping...`)
             return false
         } else {
-            let Me = this
+                if (this.assignedPort === 0) { //This will not be equal to 0 if the activation is coming after an edit() call
 
-            //Create a port assignment - Attempt to have the port ID be the same as the PR id, but we can't always have nice things
-            try {
-                if (this.Parent.PortManager.checkIfAvailable(this.options.PRID + this.Parent.configData.minPort)) {
-                    this.assignedPort = this.Parent.PortManager.bindManual(this.options.PRID, this)
-                } else {
-                    this.assignedPort = this.Parent.PortManager.bindAuto(this)
+                //Create a port assignment - Attempt to have the port ID be the same as the PR id, but we can't always have nice things
+                try {
+                    if (this.Parent.PortManager.checkIfAvailable(this.webhookData.PRID + this.Parent.configData.minPort)) {
+                        this.assignedPort = this.Parent.PortManager.bindManual(this.webhookData.PRID, this)
+                    } else {
+                        this.assignedPort = this.Parent.PortManager.bindAuto(this)
+                    }
+                } catch {
+                    //Max port probably reached
+                    return false
                 }
-            } catch {
-                //Max port probably reached
-                return false
             }
 
-            console.log(`Activating Jekyll Instance for PR ${this.options.PRID}`)
+            let _this = this
+
+            console.log(`(Re)activating Jekyll Instance for PR ${this.webhookData.PRID}`)
             this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP(this.Parent.configData)}`, `--no-watch`], {
-                cwd: `site_instances/${this.options.PRID}/docs`
+                cwd: `site_instances/${this.webhookData.PRID}/docs`
             })
 
             this.process.stdout.on("data", (data: string) => {
-                console.log(`stdout from PR ${Me.options.PRID} jekyll child: ${data}`)
+                console.log(`stdout from PR ${_this.webhookData.PRID} jekyll child: ${data}`)
             })
 
             this.process.on("error", (err: string) => {
-                console.error(`Error in Jekyll Instance for PR ${this.options.PRID}: ${err}`)
+                console.error(`Error in Jekyll Instance for PR ${this.webhookData.PRID}: ${err}`)
                 return false
             })
 
             //Set a timeout, after this time, close the Jekyll process
             this.processTimeout = setTimeout(function() {
-                Me.killJekyll()
+                _this.killJekyll()
             }, 1000 * 60 * 60 * this.Parent.configData.instanceOpenHours /*convert to milliseconds*/)
         }
         return true
     }
 
-    comment(type: "new"|"edit" = "new"): Promise<any> {
+    comment(type: "new"|"edit"|"newServerNoResources" = "new"): Promise<any> {
         let _this = this
         return new Promise(function (resolve, reject) {
             if (_this.assignedPort) {
-                let commentString = Comments.createCommentString(_this.options.PRAuthor, _this.Parent.configData.linkToDomain, _this.assignedPort, _this.Parent.configData.instanceOpenHours, type)
+                let commentString = Comments.createTemplateCommentString(_this.webhookData.PRAuthor, _this.Parent.configData.linkToDomain, _this.assignedPort, _this.Parent.configData.instanceOpenHours, type)
 
-                _this.Parent.CommentManager.SendComment(_this.options, commentString, true).then(() => {
+                _this.Parent.CommentManager.SendComment(_this.webhookData, commentString, true).then(() => {
                     resolve(true)
                 })
             }
@@ -337,7 +341,7 @@ export default class PRInstance {
         if (this.process) {
             this.process?.kill()
             delete this.process
-            console.log(`Disabled Jekyll for PR ${this.options.PRID}!`)
+            console.log(`Disabled Jekyll for PR ${this.webhookData.PRID}!`)
         }
 
         //Incase the kill ran before initial assignment (which can happen if a PR was opened, the script was restarted (cleared from memory), and then closed)

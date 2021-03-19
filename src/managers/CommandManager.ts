@@ -50,55 +50,53 @@ export default class CommandManager {
  */
 class Command {
     keyword: string
-    callback: CommandFunction
+    callback: CommandCallback
     requireAuthor: boolean
 
-    constructor(keyword: string, callback: CommandFunction, requireAuthor: boolean = true) {
+    constructor(keyword: string, CommandCallback: CommandCallback, requireAuthor: boolean = true) {
         this.keyword = keyword
-        this.callback = callback
+        this.callback = CommandCallback
         this.requireAuthor = requireAuthor
 
         CommandManager.registerCommand(this)
         return this
     }
 
-    checkMe(enteredCommand: string) {
+    public checkMe(enteredCommand: string) {
         
+    }
+
+    public runCallback() {
+        this.callback.function
     }
 }
 
 interface CommandFunction {
-    comment: string
-    commenter: string
-    PRID: number
+    (comment: string, commenter: string, PRID: number): void
 }
 
+class CommandCallback {
+
+    function: CommandFunction
+
+    constructor(callback: CommandFunction) {
+        this.function = callback
+    }
+}
 //Because there is so few commands, I'm just going to write them all in this one file. If this expands, it should probably get a directory
 
-var callback_listCommands: CommandFunction 
-callback_listCommands = (comment: string, commenter: string, PRID: number) => {
+new Command("list", new CommandCallback((comment: string, commenter: string, PRID: number) => {
     //List the four commands that can be run. If the commenter is not the PR author, prepend the message saying they can't run commands in this PR
-}
-
-var callback_requestPreview: CommandFunction
-callback_requestPreview = (comment: string, commenter: string, PRID: number) => {
+}))
+new Command("create", new CommandCallback((comment: string, commenter: string, PRID: number) => {
     //Check if the instance is running. If false, start a preview instance
 
-}
-
-var callback_destroyPreview: CommandFunction 
-callback_destroyPreview = (comment: string, commenter: string, PRID: number) => {
+}))
+new Command("destroy", new CommandCallback((comment: string, commenter: string, PRID: number) => {
     //Check if the instance is running. If true, destroy the instance
-}
-
-var callback_status: CommandFunction 
-callback_status = (comment: string, commenter: string, PRID: number) => {
+}))
+new Command("status", new CommandCallback((comment: string, commenter: string, PRID: number) => {
     //Check if the preview for the instance is running (this is simple, just need to check if the PRID instance process exists)
-}
-
-new Command("list", callback_listCommands)
-new Command("create", callback_requestPreview)
-new Command("destroy", callback_destroyPreview)
-new Command("status", callback_status)
+}))
 
 
