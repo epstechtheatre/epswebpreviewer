@@ -1,14 +1,11 @@
 //Manages the instances of the websites, including building, running and stopping them
 
-import PortManager from "./PortManager";
-
 //Manages all open instances of servers
 const download_repo_git = require("download-git-repo") 
 
 import fs from "fs"
 import {spawn} from "child_process"
-import Comments from "./CommentManager.js"
-export interface PRInstanceOptions {
+export interface PRInstanceData extends Object {
     PRID: number
     SourceRepoFullName: string
     Branch: string
@@ -97,15 +94,39 @@ class ProcessQueue extends Array {
     }
 }
 
-export default class PRInstance {
+/**
+ * Managing class for talking to individual instances
+ */
+export default class InstanceManager {
+    instances: {[key: number]: PRInstance} = {}
+    Parent: import("../index").Main
+    
+    constructor(Parent: import("../index").Main) {
+        this.Parent = Parent
 
-    static instances: {[key: string]: PRInstance} = {}
-    assignedPort: number = 0; //Initially assigned 0 but this will change before a server is opened
-    process: any;
-    processTimeout: NodeJS.Timeout | undefined;
+        return this
+    }
 
-    static getInstance(PRID: number): PRInstance {
-        let output: PRInstance = this.instances[PRID.toString()]
+    spawn(PRData: PRInstanceData) {
+        let newInstance = new PRInstance(this, PRData)
+
+        this.instances[PRData.PRID] = newInstance
+
+        return newInstance
+    }
+
+    /**
+     * @deprecated
+     */
+    destroy(PRID: number, doYouKnowWhatYoureDoing: "YesIKnowWhatImDoing"|"NoIDontKnowWhatImDoing" = "NoIDontKnowWhatImDoing") {
+        if (doYouKnowWhatYoureDoing === "YesIKnowWhatImDoing") {
+            console.warn("If anything breaks this is on you")
+            delete this.instances[PRID]
+        }
+    }
+
+    getInstance(PRID: number): PRInstance {
+        let output: PRInstance = this.instances[PRID]
 
         if (output === undefined) {
             throw Error(`[GetInstance] ${PRID} has no associated instance!`)
@@ -114,17 +135,30 @@ export default class PRInstance {
         }
     }
 
-    static checkForInstance(PRID: number): boolean {
-        let output: PRInstance = this.instances[PRID.toString()]
+    /**
+     * This returns true if the instance is cached NOT IF THE INSTANCE IS RUNNING
+     */
+    checkForInstance(PRID: number): boolean {
+        let instance = this.instances[PRID]
 
-        if (output !== undefined) {
+        if (instance !== undefined) {
             return true
         } else {
             return false
         }
     }
 
-    static prepSiteDirectory() {
+    checkIfInstanceIsActive(PRID: number): boolean {
+        let instance = this.instances[PRID]
+
+        if (instance === undefined) {
+            return false
+        }
+
+        return instance.isRunning()
+    }
+
+    prepSiteDirectory() {
         if (!fs.existsSync("./site_instances")) {
             fs.mkdirSync("./site_instances")
         }
@@ -133,29 +167,26 @@ export default class PRInstance {
     /**
      * Check if the folder for an instance exists (If an instance exists but is not cached, it implies it was opened before a script reload)
      */
-    static instanceDirExists(PRID: number): boolean {
-        if (fs.existsSync(`./site_instances/${PRID.toString()}`)) {
-            return true
-        } else {
-            return false
+    instanceDirExists(PRID: number): boolean {
+            if (fs.existsSync(`./site_instances/${PRID.toString()}`)) {
+                return true
+            } else {
+                return false
+            }
         }
-    }
+}
+class PRInstance {
+    assignedPort: number = 0; //Initially assigned 0 but this will change before a server is opened
+    process: any;
+    processTimeout: NodeJS.Timeout | undefined;
 
-    Parent: import("../index").Main;
-    webhookData: PRInstanceOptions;
+    Parent: InstanceManager;
+    webhookData: PRInstanceData;
     processQueue: ProcessQueue
 
-    /**
-     * 
-     * @param {PortManager} PortManager
-     * @param {PRInstanceOptions} webhookData 
-     * @returns {PRInstance} Instance registered in memory and can be recalled with the PR ID
-     */
-    constructor(Parent: import("../index").Main, webhookData: PRInstanceOptions) {
+    constructor(Parent: InstanceManager, webhookData: PRInstanceData) {
         this.Parent = Parent
         this.webhookData = webhookData
-
-        PRInstance.instances[this.webhookData.PRID] = this
 
         this.processQueue = new ProcessQueue(this)
 
@@ -175,9 +206,21 @@ export default class PRInstance {
                     try {
                         await _this.downloadDir()
                         if (_this.activateJekyll()) {
-                            await _this.comment("newServerNoResources")
-                        } else {
 
+                            //Conditional switch because the comment that is sent feels weird when it's replying to me
+                            switch (_this.webhookData.PRAuthor) {
+                                case "Quantum158":
+                                    await _this.comment("newMe")
+                                    break;
+
+                                default:
+                                    await _this.comment("new")
+                                    break;
+                            }
+
+
+                        } else {
+                            await _this.comment("newNoResources")
                         }
                     } catch {
                         //Right now, don't do anything, maybe in the future this will change
@@ -205,7 +248,7 @@ export default class PRInstance {
                     if (_this.activateJekyll()) {
                         await _this.comment("edit")
                     } else {
-                        await _this.comment("editFailed")
+                        //Maybe in the future this can be comment?
                     }
                 } catch {
                     //Right now, don't do anything, maybe in the future this will change
@@ -226,10 +269,11 @@ export default class PRInstance {
                 try {
                     await _this.deleteDir()
 
-                    //We should keep track of closed PRs and there is a change it will be reopened immediately (and so it needs to be in the process queue)
+                    //We should keep track of closed PRs because of this edge case: PR closed -> deleted cache, 
+                    //  PR reopened within 15 seconds -> will spawn a new process queue where it is first place so it may start to regenerate before the delete call has finished
                     if (forceRelease) {
-                        //Forcefully remove the cache of this Instance
-                        delete PRInstance.instances[_this.webhookData.PRID]
+                        //Forcefully remove the cache of this Instance (but why?)
+                        _this.Parent.destroy(_this.webhookData.PRID, "YesIKnowWhatImDoing") //No you don't
                     }
                 } catch (e) {
                     //Right now, don't do anything, maybe in the future this will change
@@ -241,7 +285,7 @@ export default class PRInstance {
 
     }
 
-    async downloadDir(): Promise<any> {
+    private async downloadDir(): Promise<any> {
         let Me = this
         return new Promise(function (resolve, reject)  {
             download_repo_git(`direct:https://github.com/${Me.webhookData.SourceRepoFullName}/archive/${Me.webhookData.Branch}.zip`, `./site_instances/${Me.webhookData.PRID.toString()}`, function(err: string) {
@@ -256,7 +300,7 @@ export default class PRInstance {
         })
     }
 
-    deleteDir(): Promise<true> {
+    private deleteDir(): Promise<true> {
         let Me = this
         return new Promise(function (resolve, reject) {
             if (!Me.instanceDirExists()) {
@@ -279,7 +323,7 @@ export default class PRInstance {
         }
     }
 
-    activateJekyll() {
+    private activateJekyll() {
         if (!fs.existsSync(`./site_instances/${this.webhookData.PRID.toString()}/docs`)) {
             console.error(`[activateJekyll] malformed instance for PR ${this.webhookData.PRID}! Skipping...`)
             return false
@@ -288,10 +332,10 @@ export default class PRInstance {
 
                 //Create a port assignment - Attempt to have the port ID be the same as the PR id, but we can't always have nice things
                 try {
-                    if (this.Parent.PortManager.checkIfAvailable(this.webhookData.PRID + this.Parent.configData.minPort)) {
-                        this.assignedPort = this.Parent.PortManager.bindManual(this.webhookData.PRID, this)
+                    if (this.Parent.Parent.PortManager.checkIfAvailable(this.webhookData.PRID + this.Parent.Parent.configData.minPort)) {
+                        this.assignedPort = this.Parent.Parent.PortManager.bindManual(this.webhookData.PRID, this)
                     } else {
-                        this.assignedPort = this.Parent.PortManager.bindAuto(this)
+                        this.assignedPort = this.Parent.Parent.PortManager.bindAuto(this)
                     }
                 } catch {
                     //Max port probably reached
@@ -302,7 +346,7 @@ export default class PRInstance {
             let _this = this
 
             console.log(`(Re)activating Jekyll Instance for PR ${this.webhookData.PRID}`)
-            this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP(this.Parent.configData)}`, `--no-watch`], {
+            this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP(this.Parent.Parent.configData)}`, `--no-watch`], {
                 cwd: `site_instances/${this.webhookData.PRID}/docs`
             })
 
@@ -318,26 +362,24 @@ export default class PRInstance {
             //Set a timeout, after this time, close the Jekyll process
             this.processTimeout = setTimeout(function() {
                 _this.killJekyll()
-            }, 1000 * 60 * 60 * this.Parent.configData.instanceOpenHours /*convert to milliseconds*/)
+            }, 1000 * 60 * 60 * this.Parent.Parent.configData.instanceOpenHours /*convert to milliseconds*/)
         }
         return true
     }
 
-    comment(type: "new"|"edit"|"newServerNoResources" = "new"): Promise<any> {
+    private comment(prebuiltCommentID: string): Promise<any> {
         let _this = this
         return new Promise(function (resolve, reject) {
-            if (_this.assignedPort) {
-                let commentString = Comments.createTemplateCommentString(_this.webhookData.PRAuthor, _this.Parent.configData.linkToDomain, _this.assignedPort, _this.Parent.configData.instanceOpenHours, type)
+            let commentString = _this.Parent.Parent.CommentManager.getTemplateCommentString(_this.webhookData, prebuiltCommentID)
 
-                _this.Parent.CommentManager.SendComment(_this.webhookData, commentString, true).then(() => {
-                    resolve(true)
-                })
-            }
+            _this.Parent.Parent.CommentManager.SendComment(_this.webhookData, commentString, true).then(() => {
+                resolve(true)
+            })
         })
 
     }
 
-    killJekyll() {
+    private killJekyll() {
         if (this.process) {
             this.process?.kill()
             delete this.process
@@ -345,10 +387,10 @@ export default class PRInstance {
         }
 
         //Incase the kill ran before initial assignment (which can happen if a PR was opened, the script was restarted (cleared from memory), and then closed)
-        if (this.assignedPort) {
-            if (!this.Parent.PortManager.checkIfAvailable(this.assignedPort)) {
-                this.Parent.PortManager.release(this.assignedPort)
-                delete this.assignedPort
+        if (this.assignedPort > 0) {
+            if (!this.Parent.Parent.PortManager.checkIfAvailable(this.assignedPort)) {
+                this.Parent.Parent.PortManager.release(this.assignedPort)
+                this.assignedPort = 0
             }
         }
 
@@ -356,6 +398,17 @@ export default class PRInstance {
         if (this.processTimeout) {
             clearInterval(this.processTimeout)
             delete this.processTimeout
+        }
+    }
+
+    /**
+     * Returns true if a process is currently defined
+     */
+    isRunning() {
+        if (this.process) {
+            return true
+        } else {
+            return false
         }
     }
 }

@@ -6,12 +6,13 @@ import InstanceManager from "./managers/InstanceManager.js"
 import PortManager from "./managers/PortManager"
 import CommandManager from "./managers/CommandManager"
 import WebhookManager, { WebhookCallback } from "./managers/WebhookManager"
+import CommentManager from "./managers/CommentManager.js"
+import GithubManager from "./managers/GithubManager.js"
 
 import {
     PullRequestEvent,
     IssueCommentEvent
 } from "@octokit/webhooks-definitions/schema"
-import CommentManager from "./managers/CommentManager.js"
 
 export interface configurationOptions {
     "linkToDomain": string,
@@ -38,24 +39,29 @@ export class Main {
     authData: authData;
     WebhookManager: WebhookManager
     CommentManager: CommentManager
+    InstanceManager: InstanceManager
+    GithubManager: GithubManager
     botLogin: string | undefined
 
 	/**
 	 * Instantiate Main Class
 	 */
 	constructor(configData: configurationOptions, authData: authData) {
-		//Ensure ./site_instances exists
-		InstanceManager.prepSiteDirectory()
+        this.configData = configData
+        this.authData = authData
 
 		//Instantiate all required managers
+        this.InstanceManager = new InstanceManager(this)
+		
+        //Ensure ./site_instances exists
+		this.InstanceManager.prepSiteDirectory()
+
 		this.PortManager = new PortManager(this, configData.minPort, configData.maxPort, configData.maxConsecutive ?? Infinity)
 		this.CommandManager = new CommandManager(this)
 
         this.WebhookManager = new WebhookManager(this)
         this.CommentManager = new CommentManager(this)
-
-		this.configData = configData
-        this.authData = authData
+        this.GithubManager = new GithubManager(this)
 	}
 
     registerBodyTypeCallback(eventName: string, CB: WebhookCallback, delay: number = 0) {
@@ -63,16 +69,6 @@ export class Main {
         this.WebhookManager.addListener(eventName, CB, delay)
 
         return this
-    }
-
-    getGithubLogin(): Promise<Main> {
-        let _this = this
-        return new Promise(function (resolve, reject) {
-            _this.CommentManager.getBotLogin().then((login) => {
-                _this.botLogin = login
-                resolve(_this)
-            })
-        })
     }
 
 	createWebhookServer() {
@@ -133,10 +129,10 @@ const PR_CB = new bodyTypeCallback((Main: Main, reqBody: PullRequestEvent) => {
                 //Build
                 
                 //Try to use an existing instance, but if it doesn't exist, then create a new one
-                if (InstanceManager.checkForInstance(PRID)) {
-                    InstanceManager.getInstance(PRID).download()
+                if (Main.InstanceManager.checkForInstance(PRID)) {
+                    Main.InstanceManager.getInstance(PRID).download()
                 } else {
-                    new InstanceManager(Main, {
+                    Main.InstanceManager.spawn({
                         "Branch": branchName,
                         "SourceRepoFullName": repo,
                         "PRID": PRID,
@@ -150,10 +146,10 @@ const PR_CB = new bodyTypeCallback((Main: Main, reqBody: PullRequestEvent) => {
             case "synchronize": //Fancy term for "more commits added"
                 //Kill, and rebuild
 
-                if (InstanceManager.checkForInstance(PRID)) {
-                    InstanceManager.getInstance(PRID).edit()
+                if (Main.InstanceManager.checkForInstance(PRID)) {
+                    Main.InstanceManager.getInstance(PRID).edit()
                 } else {
-                    new InstanceManager(Main, {
+                    Main.InstanceManager.spawn({
                         "Branch": branchName,
                         "PRID": PRID,
                         "SourceRepoFullName": repo,
@@ -167,10 +163,10 @@ const PR_CB = new bodyTypeCallback((Main: Main, reqBody: PullRequestEvent) => {
             case "closed":
                 //Kill and close
 
-                if (InstanceManager.checkForInstance(PRID)) {
-                    InstanceManager.getInstance(PRID).remove()
+                if (Main.InstanceManager.checkForInstance(PRID)) {
+                    Main.InstanceManager.getInstance(PRID).remove()
                 } else {
-                    new InstanceManager(Main, {
+                    Main.InstanceManager.spawn({
                         "Branch": branchName,
                         "PRID": PRID,
                         "SourceRepoFullName": repo,
@@ -188,6 +184,13 @@ const IC_CB = new bodyTypeCallback((Main: Main, reqBody: IssueCommentEvent) => {
     if (!isValidAction(["created"], reqBody.action)) {
         return //We are not listening to the incoming event
     }
+
+    if (reqBody.issue.pull_request === undefined) {
+        //This is not a PR comment
+        return
+    }
+
+    Main.CommandManager.parse(reqBody)
 })
 
 function isValidAction(allowedActions: Array<string>, incomingAction:string) {
@@ -200,9 +203,12 @@ function isValidAction(allowedActions: Array<string>, incomingAction:string) {
 
 const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
 
-new Main(require("./config.json"), require("./auth.json"))
+const main = new Main(require("./config.json"), require("./auth.json"))
 .registerBodyTypeCallback("issue_comment", IC_CB.function)
 .registerBodyTypeCallback("pull_request", PR_CB.function, PR_DELAY_MS)
-.getGithubLogin().then((Main) => {
-    Main.createWebhookServer()
+
+main.GithubManager.registerBotGithubUsername().then(() => {
+    
+    //We are ready
+    main.createWebhookServer()
 })

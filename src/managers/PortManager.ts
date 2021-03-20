@@ -8,12 +8,8 @@ export default class PortManager {
     maxConsecutive: number
 
     constructor(Parent: import("../index").Main, minPort: number, maxPort: number, maxConsecutive:number = Infinity) {
-        if (isNaN(minPort) || isNaN(maxPort) || isNaN(maxConsecutive)) {
-            throw Error("[PortManager] non-number provided!")
-        }
-
         if (minPort < 1 || maxPort > 65535) {
-            throw Error("[PortManager] invalid port range!")
+            throw RangeError("[PortManager] invalid port range!")
         }
 
         if (maxConsecutive === 0) {
@@ -21,7 +17,7 @@ export default class PortManager {
         }
 
         if (maxConsecutive < 0) {
-            throw Error("[PortManager] invalid consecutive assignment!")
+            throw RangeError("[PortManager] invalid consecutive assignment!")
         }
 
         this.minPort = minPort
@@ -108,7 +104,7 @@ export default class PortManager {
         }
 
         if (!this.checkInRange(portNumber)) {
-            throw Error("[bindManual] Requested port is out of range!")
+            throw RangeError("[bindManual] Requested port is out of range!")
         }
 
         if (this.checkIfAvailable(portNumber)) {

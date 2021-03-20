@@ -1,5 +1,5 @@
 import { IssueCommentEvent } from "@octokit/webhooks-definitions/schema"
-
+import { Main } from "../index"
 //The file parses every comment detected to check if it contains a command.
 
 export default class CommandManager {
@@ -25,16 +25,22 @@ export default class CommandManager {
             if (CommandManager.Commands[possibleKeyword] !== undefined) {
                 //Is a valid command keyword, lets check if the command wants the cmd sender to be the author
 
-                //TODO: CHECK IF THESE ARE THE RIGHT PATHS
-
-                //@ts-expect-error
-                if (!CommandManager.Commands[possibleKeyword].requireAuthor || ReqBody.sender.login !== ReqBody.issue.pull_request.author.login) {
+                //@ts-expect-error   Typings don't exist for pull request path
+                let isAuthor = ReqBody.sender.login !== ReqBody.issue.pull_request.author.login
+                if (CommandManager.Commands[possibleKeyword].requireAuthor && !isAuthor) {
                     return
                 }
 
                 //otherwise we can run it
-
-                CommandManager.Commands[possibleKeyword].Command.checkMe(commentBody)
+                CommandManager.Commands[possibleKeyword].Command.exec({
+                    PRID: ReqBody.issue.number,
+                    PRRepoOwner: ReqBody.repository.owner.login,
+                    PRRepo: ReqBody.repository.name,
+                    commentAuthor: ReqBody.sender.login,
+                    commentBody: ReqBody.comment.body,
+                    isAuthor: isAuthor,
+                    Parent: this.Parent
+                })
 
             }
         }
@@ -62,17 +68,22 @@ class Command {
         return this
     }
 
-    public checkMe(enteredCommand: string) {
-        
-    }
-
-    public runCallback() {
-        this.callback.function
+    public exec(data: CommandFunctionData) {
+        this.callback.function(data)
     }
 }
 
+interface CommandFunctionData {
+    commentBody: string,
+    commentAuthor: string
+    PRID: number
+    PRRepoOwner: string
+    PRRepo: string
+    isAuthor: boolean
+    Parent: Main
+}
 interface CommandFunction {
-    (comment: string, commenter: string, PRID: number): void
+    (data: CommandFunctionData): void
 }
 
 class CommandCallback {
@@ -83,20 +94,33 @@ class CommandCallback {
         this.function = callback
     }
 }
-//Because there is so few commands, I'm just going to write them all in this one file. If this expands, it should probably get a directory
 
-new Command("list", new CommandCallback((comment: string, commenter: string, PRID: number) => {
+//Because there are so few commands, I'm just going to write them all in this one file. If this expands, it should probably get a directory
+new Command("list", new CommandCallback((data: CommandFunctionData) => {
     //List the four commands that can be run. If the commenter is not the PR author, prepend the message saying they can't run commands in this PR
-}))
-new Command("create", new CommandCallback((comment: string, commenter: string, PRID: number) => {
+
+    let commandResponse = ""
+
+    if (data.Parent.InstanceManager.checkIfInstanceIsActive(data.PRID)) {
+        commandResponse += `\n\`${data.Parent.GithubManager.getGithubUsername()}`
+    }
+
+    if (data.isAuthor) {
+        data.Parent.CommentManager.SendComment({
+            PRID: data.PRID,
+            PRRepoAccount: data.PRRepoOwner,
+            PRRepoName: data.PRRepo
+        }, "You can run the following commands in this comment thread:")
+    }
+
+}), false)
+new Command("create", new CommandCallback((data: CommandFunctionData) => {
     //Check if the instance is running. If false, start a preview instance
 
 }))
-new Command("destroy", new CommandCallback((comment: string, commenter: string, PRID: number) => {
+new Command("destroy", new CommandCallback((data: CommandFunctionData) => {
     //Check if the instance is running. If true, destroy the instance
 }))
-new Command("status", new CommandCallback((comment: string, commenter: string, PRID: number) => {
+new Command("status", new CommandCallback((data: CommandFunctionData) => {
     //Check if the preview for the instance is running (this is simple, just need to check if the PRID instance process exists)
 }))
-
-

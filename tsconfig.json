@@ -12,7 +12,11 @@
         "forceConsistentCasingInFileNames": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "allowJs": false,
+        "outDir": "build",
+        "moduleResolution": "Node",
+        "removeComments": true
     },
     "exclude": [
         "node_modules",
