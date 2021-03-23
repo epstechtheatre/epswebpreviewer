@@ -34,8 +34,7 @@ export default class CommentManager {
     getTemplateCommentString(data: PRInstanceData, commentIdentifier: string) {
         //Convert data to CommentData object
 
-        //@ts-expect-error
-        let commentData: CommentData = (data)
+        let commentData: CommentData = (data as CommentData)
         commentData.botLoginUsername = this.Parent.GithubManager.getGithubUsername()
         
         let comment = CommentManager.registeredPrebuiltResponses[commentIdentifier]?.buildMessage(commentData)
@@ -82,16 +81,16 @@ class PrebuiltComment {
         */ 
         let textSnapshot = this.text
 
-        while (this.text.search(/~~\{.{1,}\}/mi) > 0) {
-            let matchIndex = textSnapshot.search(/~~\{.{1,}\}/mi)
+        while (textSnapshot.search(/(~{2}\{.*?\})/mi) > 0) {
+            let matchIndex = textSnapshot.search(/(~{2}\{.*?\})/mi)
 
             //@ts-expect-error //It is lying, match can't return an error because we can only remain in the while loop if a pattern is found
-            let keyName = textSnapshot.substring(matchIndex + 3, matchIndex + textSnapshot.match(/~~\{.{1,}\}/mi)[0].length - 2)
+            let keyName = textSnapshot.substring(matchIndex + 3, matchIndex + textSnapshot.match(/(~{2}\{.*?\})/mi)[0].length - 1)
 
             if (data.hasOwnProperty(keyName)) {
                 //@ts-expect-error //This is also lying
                 let replacement = data[keyName]
-                textSnapshot.replace(/~~\{.{1,}\}/mi, replacement)
+                textSnapshot = textSnapshot.replace(/(~{2}\{.*?\})/mi, replacement)
 
             } else {
                 throw Error(`[Comment Build] Unknown variable ${keyName} requested!`)
@@ -109,4 +108,4 @@ new PrebuiltComment("newModified", "Hey there, @~~{PRAuthor}!\nI've spun up a se
 
 new PrebuiltComment("edit", "I've plugged your latest changes into the preview, so I'll keep it open longer. [Click Here](http://~~{linkDomain}:~~{assignedPort} \"Click to go to preview site\") to go to the preview site")
 
-new PrebuiltComment("newNoResources", "Hey there, ~~${PRAuthor}!\nThere's a lot of traffic right now so I wasn't able to create a website preview.\n<br>\nIf you need a preview, you can ask me to try again in a few hours.\nPost a comment mentioning me as the first word and then type 'create'")
+new PrebuiltComment("newNoResources", "Hey there, ~~${PRAuthor}!\nThere's a lot of traffic right now so I wasn't able to create a website preview.\n<br>\nIf you need a preview, you can ask me to try again in a few hours.\nPost a comment with this exact text: `@~~{botLoginUsername} create`")

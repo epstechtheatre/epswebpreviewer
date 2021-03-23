@@ -1,3 +1,6 @@
+import { PullRequestEvent } from "@octokit/webhooks-definitions/schema";
+import { resolve } from "node:path";
+
 //Manage comments sent out to PR threads
 const Github = require("github-api");
 
@@ -20,14 +23,11 @@ export default class GithubManager {
     registerBotGithubUsername(): Promise<string> {
         let _this = this
         return new Promise(async function (resolve, reject) {
-            let Me = _this.gh.getUser() //No params defaults to login user
+            let Me = await _this.gh.getUser().getProfile() //No params defaults to login user
 
-            //TODO: Something
+            _this.githubUsername = (Me.data.login as string)
 
-            _this.githubUsername = Me
-
-            resolve(Me)
-
+            resolve(_this.githubUsername)
         })
     }
 
@@ -39,5 +39,19 @@ export default class GithubManager {
 
     getGithubUsername() {
         return this.githubUsername ?? "Unregistered"
+    }
+
+    getPR(RepoAuthor: string, RepoName: string, PRID: number): Promise<PullRequestEvent> {
+        let _this = this
+        return new Promise(async function (resolve, reject) {
+            let PRreq; 
+            try {
+                PRreq = await _this.gh.getRepo(RepoAuthor, RepoName).getPullRequest(PRID)
+            } catch (e) {
+                throw e
+            }
+            
+            resolve(({"pull_request": PRreq.data} as PullRequestEvent))
+        })
     }
 }

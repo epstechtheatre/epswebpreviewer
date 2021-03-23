@@ -14,7 +14,7 @@ export interface PRInstanceData extends Object {
     PRAuthor: string
 }
 
-interface processQueueTask { (Me: PRInstance): Promise<any> }
+type processQueueTask = { ():any }
 
 /**
  * Queue asynchronous tasks to run in a defined order, while retaining the benefits of asynchronous code.
@@ -35,7 +35,7 @@ class ProcessQueue extends Array {
     /**
      * Add a process to the operations queue
      */
-    public addProcess(callback: Promise<any>) {
+    public addProcess(callback: processQueueTask) {
         super.push(callback)
 
         if (!this.running) {
@@ -78,7 +78,7 @@ class ProcessQueue extends Array {
             while (snapshot.length > 0) { //For all the items in the snapshot, run them one by one
                 let instance = snapshot.shift()
                 if (instance) {
-                    await instance(Me.parent);
+                    await instance();
                 }
             }
             
@@ -195,8 +195,8 @@ class PRInstance {
 
     async download() {
         let _this = this
-        this.processQueue.addProcess(
-            new Promise(async function (resolve, reject) {
+        this.processQueue.addProcess(async () => {
+            return new Promise(async function (resolve, reject) {
                 //Check if already exists, if so, stop this and swap to edit
                 if (_this.instanceDirExists()) {
                     await _this.edit()
@@ -210,11 +210,11 @@ class PRInstance {
                             //Conditional switch because the comment that is sent feels weird when it's replying to me
                             switch (_this.webhookData.PRAuthor) {
                                 case "Quantum158":
-                                    await _this.comment("newMe")
+                                    await _this.comment("newModified")
                                     break;
 
                                 default:
-                                    await _this.comment("new")
+                                    await _this.comment("newDefault")
                                     break;
                             }
 
@@ -232,13 +232,13 @@ class PRInstance {
                     }
                 }
             })
-        )
+        })
     }
 
     async edit() {
         let _this = this
-        this.processQueue.addProcess(
-            new Promise(async function (resolve, reject) {
+        this.processQueue.addProcess(() => {
+            return new Promise(async function (resolve, reject) {
                 //Start by killing any open instance of this PR
                 _this.killJekyll()
 
@@ -257,13 +257,13 @@ class PRInstance {
                     resolve(true)
                 }
             })
-        )
+        })
     }
 
     async remove(forceRelease = false) {
         let _this = this
-        this.processQueue.addProcess(
-            new Promise(async function (resolve, reject) {
+        this.processQueue.addProcess(() => {
+            return new Promise(async function (resolve, reject) {
                 _this.killJekyll()
                 
                 try {
@@ -281,8 +281,7 @@ class PRInstance {
                     resolve(true)
                 }
             })
-        )
-
+        })
     }
 
     private async downloadDir(): Promise<any> {
@@ -328,12 +327,12 @@ class PRInstance {
             console.error(`[activateJekyll] malformed instance for PR ${this.webhookData.PRID}! Skipping...`)
             return false
         } else {
-                if (this.assignedPort === 0) { //This will not be equal to 0 if the activation is coming after an edit() call
+            if (this.assignedPort === 0) { //This will not be equal to 0 if the activation is coming after an edit() call
 
                 //Create a port assignment - Attempt to have the port ID be the same as the PR id, but we can't always have nice things
                 try {
                     if (this.Parent.Parent.PortManager.checkIfAvailable(this.webhookData.PRID + this.Parent.Parent.configData.minPort)) {
-                        this.assignedPort = this.Parent.Parent.PortManager.bindManual(this.webhookData.PRID, this)
+                        this.assignedPort = this.Parent.Parent.PortManager.bindManual(this.webhookData.PRID + this.Parent.Parent.configData.minPort, this)
                     } else {
                         this.assignedPort = this.Parent.Parent.PortManager.bindAuto(this)
                     }
@@ -342,8 +341,6 @@ class PRInstance {
                     return false
                 }
             }
-
-            let _this = this
 
             console.log(`(Re)activating Jekyll Instance for PR ${this.webhookData.PRID}`)
             this.process = spawn(`bundle`, [`exec`, `jekyll`, `serve`, `-P`, `${(this.assignedPort).toString()}`,`-H`, `${getInternalIP(this.Parent.Parent.configData)}`, `--no-watch`], {
@@ -360,6 +357,7 @@ class PRInstance {
             })
 
             //Set a timeout, after this time, close the Jekyll process
+            let _this = this
             this.processTimeout = setTimeout(function() {
                 _this.killJekyll()
             }, 1000 * 60 * 60 * this.Parent.Parent.configData.instanceOpenHours /*convert to milliseconds*/)

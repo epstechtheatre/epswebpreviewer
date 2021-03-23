@@ -181,13 +181,18 @@ const PR_CB = new bodyTypeCallback((Main: Main, reqBody: PullRequestEvent) => {
 })
 
 const IC_CB = new bodyTypeCallback((Main: Main, reqBody: IssueCommentEvent) => {
+    if (reqBody.sender.login === Main.GithubManager.getGithubUsername()) return //Don't listen to self
+    
     if (!isValidAction(["created"], reqBody.action)) {
         return //We are not listening to the incoming event
     }
 
     if (reqBody.issue.pull_request === undefined) {
-        //This is not a PR comment
+        Main.CommandManager.sendNonPRResponse(reqBody)
         return
+    }
+    if (reqBody.issue.state === "closed") {
+        return //This is a closed PR
     }
 
     Main.CommandManager.parse(reqBody)
@@ -203,7 +208,7 @@ function isValidAction(allowedActions: Array<string>, incomingAction:string) {
 
 const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
 
-const main = new Main(require("./config.json"), require("./auth.json"))
+const main = new Main(require(process.cwd() + "/config.json"), require(process.cwd() + "/auth.json"))
 .registerBodyTypeCallback("issue_comment", IC_CB.function)
 .registerBodyTypeCallback("pull_request", PR_CB.function, PR_DELAY_MS)
 
