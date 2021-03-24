@@ -2,12 +2,12 @@
 import express from "express"
 import bodyParser from "body-parser"
 
-import InstanceManager from "./managers/InstanceManager.js"
+import InstanceManager from "./managers/InstanceManager"
 import PortManager from "./managers/PortManager"
 import CommandManager from "./managers/CommandManager"
 import WebhookManager, { WebhookCallback } from "./managers/WebhookManager"
-import CommentManager from "./managers/CommentManager.js"
-import GithubManager from "./managers/GithubManager.js"
+import CommentManager from "./managers/CommentManager"
+import GithubManager from "./managers/GithubManager"
 
 import {
     PullRequestEvent,
@@ -206,7 +206,7 @@ function isValidAction(allowedActions: Array<string>, incomingAction:string) {
     }
 }
 
-const PR_DELAY_MS = 15000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
+const PR_DELAY_MS = 5000 //This should be set long enough (about 15 seconds or so) so that Github has time to generate a new zip archive for the branch
 
 const main = new Main(require(process.cwd() + "/config.json"), require(process.cwd() + "/auth.json"))
 .registerBodyTypeCallback("issue_comment", IC_CB.function)
