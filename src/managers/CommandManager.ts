@@ -156,15 +156,16 @@ new Command("create", new CommandCallback(async (data: CommandFunctionData) => {
         }, `You already have an active preview!\n\nHere's a link to it: ${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)    
     } else {
         if (data.Parent.InstanceManager.checkForInstance(data.PRID)) {
-            await data.Parent.InstanceManager.getInstance(data.PRID).download(true, () => {
-                data.Parent.CommentManager.SendComment({
-                    PRID: data.PRID,
-                    PRRepoAccount: data.PRRepoOwner,
-                    PRRepoName: data.PRRepo
-                }, `Preview created!\n\nHere's a link to it: ${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)                
+            await data.Parent.InstanceManager.getInstance(data.PRID).download(true, (result) => {
+                if (result !== "newNoResources" && result !== false) {
+                    data.Parent.CommentManager.SendComment({
+                        PRID: data.PRID,
+                        PRRepoAccount: data.PRRepoOwner,
+                        PRRepoName: data.PRRepo
+                    }, `Preview created!\n\nHere's a link to it: ${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)                              
+                }
             })
-
-       } else {
+        } else {
             let PRData = await data.Parent.GithubManager.getPR(data.PRRepoOwner, data.PRRepo, data.PRID)
 
             await data.Parent.InstanceManager.spawn({

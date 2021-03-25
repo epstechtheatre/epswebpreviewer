@@ -105,78 +105,76 @@ class bodyTypeCallback {
 }
 
 const PR_CB = new bodyTypeCallback((Main: Main, reqBody: PullRequestEvent) => {
-    if (reqBody.number) {
-        if (!isValidAction(["opened", "reopened", "synchronize", "closed"], reqBody.action)) {
-            return; //We are not listening to the incoming event
-        }
+    if (!isValidAction(["opened", "reopened", "synchronize", "closed"], reqBody.action)) {
+        return; //We are not listening to the incoming event
+    }
 
-        console.log(`Valid Hook Received!\nType: ${reqBody.action} | Issue: ${reqBody.number}`)
+    console.log(`Valid Hook Received!\nType: ${reqBody.action} | Issue: ${reqBody.number}`)
 
-        //If we make it here, it is a valid pull request type
+    //If we make it here, it is a valid pull request type
 
-        //Get the PR information
-        let branchName = reqBody.pull_request.head.ref
-        let repo = reqBody.pull_request.head.repo.full_name
-        let PRID = reqBody.number
-        let prRepo = reqBody.repository.name
-        let prRepoAuthor = reqBody.repository.owner.login
-        let prAuthor = reqBody.sender.login
+    //Get the PR information
+    let branchName = reqBody.pull_request.head.ref
+    let repo = reqBody.pull_request.head.repo.full_name
+    let PRID = reqBody.number
+    let prRepo = reqBody.repository.name
+    let prRepoAuthor = reqBody.repository.owner.login
+    let prAuthor = reqBody.sender.login
 
-        //Lets figure out what stage the PR is in
-        switch (reqBody.action) {
-            case "opened":
-            case "reopened":
-                //Build
-                
-                //Try to use an existing instance, but if it doesn't exist, then create a new one
-                if (Main.InstanceManager.checkForInstance(PRID)) {
-                    Main.InstanceManager.getInstance(PRID).download()
-                } else {
-                    Main.InstanceManager.spawn({
-                        "Branch": branchName,
-                        "SourceRepoFullName": repo,
-                        "PRID": PRID,
-                        "PRRepoAccount": prRepoAuthor,
-                        "PRRepoName": prRepo,
-                        "PRAuthor": prAuthor
-                    }).download()
-                }
-                break;
+    //Lets figure out what stage the PR is in
+    switch (reqBody.action) {
+        case "opened":
+        case "reopened":
+            //Build
+            
+            //Try to use an existing instance, but if it doesn't exist, then create a new one
+            if (Main.InstanceManager.checkForInstance(PRID)) {
+                Main.InstanceManager.getInstance(PRID).download()
+            } else {
+                Main.InstanceManager.spawn({
+                    "Branch": branchName,
+                    "SourceRepoFullName": repo,
+                    "PRID": PRID,
+                    "PRRepoAccount": prRepoAuthor,
+                    "PRRepoName": prRepo,
+                    "PRAuthor": prAuthor
+                }).download()
+            }
+            break;
 
-            case "synchronize": //Fancy term for "more commits added"
-                //Kill, and rebuild
+        case "synchronize": //Fancy term for "more commits added"
+            //Kill, and rebuild
 
-                if (Main.InstanceManager.checkForInstance(PRID)) {
-                    Main.InstanceManager.getInstance(PRID).edit()
-                } else {
-                    Main.InstanceManager.spawn({
-                        "Branch": branchName,
-                        "PRID": PRID,
-                        "SourceRepoFullName": repo,
-                        "PRRepoAccount": prRepoAuthor,
-                        "PRRepoName": prRepo,
-                        "PRAuthor": prAuthor
-                    }).edit()
-                }
-                break
+            if (Main.InstanceManager.checkForInstance(PRID)) {
+                Main.InstanceManager.getInstance(PRID).edit()
+            } else {
+                Main.InstanceManager.spawn({
+                    "Branch": branchName,
+                    "PRID": PRID,
+                    "SourceRepoFullName": repo,
+                    "PRRepoAccount": prRepoAuthor,
+                    "PRRepoName": prRepo,
+                    "PRAuthor": prAuthor
+                }).edit()
+            }
+            break
 
-            case "closed":
-                //Kill and close
+        case "closed":
+            //Kill and close
 
-                if (Main.InstanceManager.checkForInstance(PRID)) {
-                    Main.InstanceManager.getInstance(PRID).remove()
-                } else {
-                    Main.InstanceManager.spawn({
-                        "Branch": branchName,
-                        "PRID": PRID,
-                        "SourceRepoFullName": repo,
-                        "PRRepoAccount": prRepoAuthor,
-                        "PRRepoName": prRepo,
-                        "PRAuthor": prAuthor
-                    }).remove()
-                }
-                break;
-        }
+            if (Main.InstanceManager.checkForInstance(PRID)) {
+                Main.InstanceManager.getInstance(PRID).remove()
+            } else {
+                Main.InstanceManager.spawn({
+                    "Branch": branchName,
+                    "PRID": PRID,
+                    "SourceRepoFullName": repo,
+                    "PRRepoAccount": prRepoAuthor,
+                    "PRRepoName": prRepo,
+                    "PRAuthor": prAuthor
+                }).remove()
+            }
+            break;
     }
 })
 

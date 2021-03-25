@@ -14,7 +14,9 @@ export interface PRInstanceData extends Object {
     PRAuthor: string
 }
 
-type processQueueTask = { ():any }
+type processQueueTask = { ():Promise<any> }
+
+type completedCB = { (result: string|boolean):void }
 
 /**
  * Queue asynchronous tasks to run in a defined order, while retaining the benefits of asynchronous code.
@@ -76,10 +78,7 @@ class ProcessQueue extends Array {
             Me.splice(0, snapshot.length)//Splice the processing tasks out of the save queue
     
             while (snapshot.length > 0) { //For all the items in the snapshot, run them one by one
-                let instance = snapshot.shift()
-                if (instance) {
-                    await instance();
-                }
+                await (snapshot.shift() as processQueueTask)() //This will always be defined because it is in a conditional while
             }
             
             if (Me.length > 0) { //If new tasks have come in since the task started, recurse back into another pass
@@ -193,15 +192,17 @@ class PRInstance {
         return this
     }
 
-    async download(fromCommand: boolean = false, completedCB?:Function) {
+    async download(fromCommand: boolean = false, completedCB?:completedCB) {
         let _this = this
+
+        let result: string; 
         this.processQueue.addProcess(async () => {
             return new Promise(async function (resolve, reject) {
                 //Check if already exists, if so, stop this and swap to edit
                 if (_this.instanceDirExists()) {
-                    await _this.edit(fromCommand, completedCB)
+                    _this.edit(fromCommand, completedCB)
                     resolve(true)
-
+                    return
                 } else {
                     try {
                         await _this.downloadDir()
@@ -212,32 +213,36 @@ class PRInstance {
                                 switch (_this.webhookData.PRAuthor) {
                                     case "Quantum158":
                                         await _this.comment("newModified")
+                                        result = "newModified"
                                         break;
     
                                     default:
                                         await _this.comment("newDefault")
+                                        result = "newDefault"
                                         break;
                                 }
                             }
 
                         } else {
                             await _this.comment("newNoResources")
+                            result = "newNoResources"
                         }
                     } catch {
                         //Right now, don't do anything, maybe in the future this will change
 
-                    } finally {
-                        //Want to make sure that regardless of what happens, the promise is fulfilled
-                        if (completedCB) { completedCB() }
-                        resolve(true)
                     }
+
+                    //Want to make sure that regardless of what happens, the promise is fulfilled
+                    if (completedCB) { completedCB(result) }
+                    resolve(true)
                 }
             })
         })
     }
 
-    async edit(fromCommand: boolean = false, completedCB?:Function) {
+    async edit(fromCommand: boolean = false, completedCB?:completedCB) {
         let _this = this
+        let result: boolean
         this.processQueue.addProcess(() => {
             return new Promise(async function (resolve, reject) {
                 //Start by killing any open instance of this PR
@@ -248,22 +253,26 @@ class PRInstance {
                     await _this.downloadDir()
                     if (_this.activateJekyll() && !fromCommand) {
                         await _this.comment("edit")
+                        result = true;
                     } else {
                         //Maybe in the future this can be comment?
+                        result = false
                     }
                 } catch {
                     //Right now, don't do anything, maybe in the future this will change
+                    result = false;
 
-                } finally {
-                    if (completedCB) {completedCB()}
-                    resolve(true)
                 }
+
+                if (completedCB) {completedCB(result)}
+                resolve(true)
             })
         })
     }
 
-    async remove(forceRelease = false, completedCB?:Function) {
+    async remove(forceRelease = false, completedCB?:completedCB) {
         let _this = this
+        let result: boolean
         this.processQueue.addProcess(() => {
             return new Promise(async function (resolve, reject) {
                 _this.killJekyll()
@@ -277,12 +286,13 @@ class PRInstance {
                         //Forcefully remove the cache of this Instance (but why?)
                         _this.Parent.destroy(_this.webhookData.PRID, "YesIKnowWhatImDoing") //No you don't
                     }
+                    result = true;
                 } catch (e) {
                     //Right now, don't do anything, maybe in the future this will change
-                } finally {
-                    if (completedCB) {completedCB() }
-                    resolve(true)
+                    result = false;
                 }
+                if (completedCB) {completedCB(result) }
+                resolve(true)
             })
         })
     }
@@ -370,12 +380,12 @@ class PRInstance {
 
     private comment(prebuiltCommentID: string): Promise<any> {
         let _this = this
-        return new Promise(function (resolve, reject) {
+        return new Promise(async function (resolve, reject) {
             let commentString = _this.Parent.Parent.CommentManager.getTemplateCommentString(_this.webhookData, prebuiltCommentID)
 
-            _this.Parent.Parent.CommentManager.SendComment(_this.webhookData, commentString, true).then(() => {
-                resolve(true)
-            })
+            await _this.Parent.Parent.CommentManager.SendComment(_this.webhookData, commentString, true)
+
+            resolve(true)
         })
 
     }
@@ -400,6 +410,8 @@ class PRInstance {
             clearInterval(this.processTimeout)
             delete this.processTimeout
         }
+
+        return
     }
 
     /**

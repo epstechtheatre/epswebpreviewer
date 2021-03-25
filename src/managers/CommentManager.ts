@@ -24,7 +24,9 @@ export default class CommentManager {
             commentString = CommentManager.fancify(commentString)
         }
         return new Promise(async function (resolve, reject) {
-            _this.Parent.GithubManager.SendComment(options.PRRepoAccount, options.PRRepoName, options.PRID, commentString)
+            await _this.Parent.GithubManager.SendComment(options.PRRepoAccount, options.PRRepoName, options.PRID, commentString)
+
+            resolve(true)
         })
     }
 
