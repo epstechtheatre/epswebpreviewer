@@ -25,4 +25,4 @@ The current commands are as follows:
 
 `@EPSWebPreview create` Request a preview site. The script will comment a link to a create site if it can.
 
-`@EPSWebPreview destroy` Request to stop a preview site (how courteous of you)
+`@EPSWebPreview delete` Request to stop a preview site (how courteous of you)
