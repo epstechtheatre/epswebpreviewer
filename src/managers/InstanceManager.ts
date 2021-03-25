@@ -193,13 +193,13 @@ class PRInstance {
         return this
     }
 
-    async download() {
+    async download(fromCommand: boolean = false, completedCB?:Function) {
         let _this = this
         this.processQueue.addProcess(async () => {
             return new Promise(async function (resolve, reject) {
                 //Check if already exists, if so, stop this and swap to edit
                 if (_this.instanceDirExists()) {
-                    await _this.edit()
+                    await _this.edit(fromCommand, completedCB)
                     resolve(true)
 
                 } else {
@@ -208,16 +208,17 @@ class PRInstance {
                         if (_this.activateJekyll()) {
 
                             //Conditional switch because the comment that is sent feels weird when it's replying to me
-                            switch (_this.webhookData.PRAuthor) {
-                                case "Quantum158":
-                                    await _this.comment("newModified")
-                                    break;
-
-                                default:
-                                    await _this.comment("newDefault")
-                                    break;
+                            if (!fromCommand) {
+                                switch (_this.webhookData.PRAuthor) {
+                                    case "Quantum158":
+                                        await _this.comment("newModified")
+                                        break;
+    
+                                    default:
+                                        await _this.comment("newDefault")
+                                        break;
+                                }
                             }
-
 
                         } else {
                             await _this.comment("newNoResources")
@@ -227,7 +228,7 @@ class PRInstance {
 
                     } finally {
                         //Want to make sure that regardless of what happens, the promise is fulfilled
-
+                        if (completedCB) { completedCB() }
                         resolve(true)
                     }
                 }
@@ -235,7 +236,7 @@ class PRInstance {
         })
     }
 
-    async edit() {
+    async edit(fromCommand: boolean = false, completedCB?:Function) {
         let _this = this
         this.processQueue.addProcess(() => {
             return new Promise(async function (resolve, reject) {
@@ -245,7 +246,7 @@ class PRInstance {
                 try {
                     await _this.deleteDir()
                     await _this.downloadDir()
-                    if (_this.activateJekyll()) {
+                    if (_this.activateJekyll() && !fromCommand) {
                         await _this.comment("edit")
                     } else {
                         //Maybe in the future this can be comment?
@@ -254,13 +255,14 @@ class PRInstance {
                     //Right now, don't do anything, maybe in the future this will change
 
                 } finally {
+                    if (completedCB) {completedCB()}
                     resolve(true)
                 }
             })
         })
     }
 
-    async remove(forceRelease = false) {
+    async remove(forceRelease = false, completedCB?:Function) {
         let _this = this
         this.processQueue.addProcess(() => {
             return new Promise(async function (resolve, reject) {
@@ -278,6 +280,7 @@ class PRInstance {
                 } catch (e) {
                     //Right now, don't do anything, maybe in the future this will change
                 } finally {
+                    if (completedCB) {completedCB() }
                     resolve(true)
                 }
             })
@@ -380,9 +383,9 @@ class PRInstance {
     private killJekyll() {
         if (this.process) {
             this.process?.kill()
-            delete this.process
             console.log(`Disabled Jekyll for PR ${this.webhookData.PRID}!`)
         }
+        this.process = undefined
 
         //Incase the kill ran before initial assignment (which can happen if a PR was opened, the script was restarted (cleared from memory), and then closed)
         if (this.assignedPort > 0) {

@@ -7,7 +7,7 @@
                 "properties": {
                     "linkToDomain": {
                         "type": "string",
-                        "description": "The public domain that generated sites will point to. This is only used in comment url link generation."
+                        "description": "The public domain that generated sites will point to. This is only used in comment url link generation. Make sure to include http(s)://"
         
                     },
                     "internalIPOverride": {
@@ -55,7 +55,6 @@
                     "maxConsecutive",
                     "instanceOpenHours",
                     "webhookPort",
-                    "lang"
                 ],
                 "additionalProperties": false
             },

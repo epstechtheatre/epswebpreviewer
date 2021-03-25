@@ -18,35 +18,49 @@ export default class CommandManager {
     /**
      * Parse a potential command. If the command is valid and the commenter is the author of the PR, then run the command's callback
      */
-    public parse(ReqBody: IssueCommentEvent) {
+    public parse(ReqBody: IssueCommentEvent): void {
         let commentBody = ReqBody.comment.body
-        if (commentBody.startsWith("@EPSWebPreview")) {
+
+        let isAuthor = ReqBody.sender.login === ReqBody.issue.user.login
+                
+        let passData = {
+            PRID: ReqBody.issue.number,
+            PRRepoOwner: ReqBody.repository.owner.login,
+            PRRepo: ReqBody.repository.name,
+            commentAuthor: ReqBody.sender.login,
+            commentBody: ReqBody.comment.body,
+            isAuthor: isAuthor,
+            Parent: this.Parent
+        }
+
+        if (commentBody.startsWith(`@${this.Parent.GithubManager.getGithubUsername()}`)) {
+            if (commentBody.trim() === `@${this.Parent.GithubManager.getGithubUsername()}`) {
+                //Comment only mentioned the bot and nothing else
+                CommandManager.Commands["_onlyMention"]?.Command.exec(passData)
+            }
+
             let possibleKeyword = commentBody.split(" ")[1].toLowerCase()
+
             if (CommandManager.Commands[possibleKeyword] !== undefined) {
                 //Is a valid command keyword, lets check if the command wants the cmd sender to be the author
 
-                let isAuthor = ReqBody.sender.login === ReqBody.issue.user.login
                 if (CommandManager.Commands[possibleKeyword].requireAuthor && !isAuthor) {
-                    return
+                    //User does not have permission, send that response, if it was registered
+                    CommandManager.Commands["_noPermission"]?.Command.exec(passData)
+                    return;
                 }
 
                 //otherwise we can run it
-                CommandManager.Commands[possibleKeyword].Command.exec({
-                    PRID: ReqBody.issue.number,
-                    PRRepoOwner: ReqBody.repository.owner.login,
-                    PRRepo: ReqBody.repository.name,
-                    commentAuthor: ReqBody.sender.login,
-                    commentBody: ReqBody.comment.body,
-                    isAuthor: isAuthor,
-                    Parent: this.Parent
-                })
+                CommandManager.Commands[possibleKeyword].Command.exec(passData)
 
+            } else {
+                CommandManager.Commands["_invalidCommand"]?.Command.exec(passData)
             }
         }
     }
 
     public static registerCommand(Command: Command) {
-        this.Commands[Command.keyword.toLowerCase()] = { "Command": Command, "requireAuthor": Command.requireAuthor}
+        this.Commands[Command.keyword] = { "Command": Command, "requireAuthor": Command.requireAuthor}
     }
 
     public sendNonPRResponse(ReqBody: IssueCommentEvent) {
@@ -66,6 +80,9 @@ class Command {
     callback: CommandCallback
     requireAuthor: boolean
 
+    /**
+     * @param keyword Keywords _onlyMention, _invalidCommand, _noPermission
+     */
     constructor(keyword: string, CommandCallback: CommandCallback, requireAuthor: boolean = true) {
         this.keyword = keyword
         this.callback = CommandCallback
@@ -112,15 +129,15 @@ new Command("help", new CommandCallback((data: CommandFunctionData) => {
         commandResponse += "As you are the author of these changes, you can currently run the following commands in this thread:"
 
         if (data.Parent.InstanceManager.checkIfInstanceIsActive(data.PRID)) {
-            commandResponse += `\n\n\`@${data.Parent.GithubManager.getGithubUsername()} destroy\` <-- close your preview site`
+            commandResponse += `\n\n\`@${data.Parent.GithubManager.getGithubUsername()} delete\` <-- close your preview site`
         } else {
             commandResponse += `\n\n\`@${data.Parent.GithubManager.getGithubUsername()} create\` <-- create a preview site for you changes`
         }
     }
 
-    commandResponse += `\n\n\`@${data.Parent.GithubManager.getGithubUsername()} status\` <-- check for and link to an active preview if one exists for these changes`
+    commandResponse += `\n\n\`@${data.Parent.GithubManager.getGithubUsername()} status\` <-- check for and link to an active preview (if one exists for this thread)`
 
-    commandResponse += `\n\n<br>\`@${data.Parent.GithubManager.getGithubUsername()} help\` <-- send this comment`
+    commandResponse += `\n\n<br>\`@${data.Parent.GithubManager.getGithubUsername()} help\` <-- resend this comment`
 
     data.Parent.CommentManager.SendComment({
         PRID: data.PRID,
@@ -136,41 +153,54 @@ new Command("create", new CommandCallback(async (data: CommandFunctionData) => {
             PRID: data.PRID,
             PRRepoAccount: data.PRRepoOwner,
             PRRepoName: data.PRRepo
-        }, `You already have an active preview!\n\nHere is a link to it: http://${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)    
+        }, `You already have an active preview!\n\nHere's a link to it: ${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)    
     } else {
         if (data.Parent.InstanceManager.checkForInstance(data.PRID)) {
-            data.Parent.InstanceManager.getInstance(data.PRID).download()
-        } else {
+            await data.Parent.InstanceManager.getInstance(data.PRID).download(true, () => {
+                data.Parent.CommentManager.SendComment({
+                    PRID: data.PRID,
+                    PRRepoAccount: data.PRRepoOwner,
+                    PRRepoName: data.PRRepo
+                }, `Preview created!\n\nHere's a link to it: ${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)                
+            })
 
+       } else {
             let PRData = await data.Parent.GithubManager.getPR(data.PRRepoOwner, data.PRRepo, data.PRID)
 
-            data.Parent.InstanceManager.spawn({
+            await data.Parent.InstanceManager.spawn({
                 Branch: PRData.pull_request.head.ref,
                 SourceRepoFullName: PRData.pull_request.head.repo.full_name,
                 PRAuthor: PRData.pull_request.user.login,
                 PRID: data.PRID,
                 PRRepoAccount: data.PRRepoOwner,
                 PRRepoName: data.PRRepo
-            }).download()
-        }
+            }).download(true, () => {
+                data.Parent.CommentManager.SendComment({
+                    PRID: data.PRID,
+                    PRRepoAccount: data.PRRepoOwner,
+                    PRRepoName: data.PRRepo
+                }, `Preview created!\n\nHere's a link to it: ${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)                
+            })
+       }
     }
 
 }))
-new Command("destroy", new CommandCallback(async (data: CommandFunctionData) => {
+new Command("delete", new CommandCallback(async (data: CommandFunctionData) => {
     //Check if the instance is running. If true, destroy the instance
     if (!data.Parent.InstanceManager.checkIfInstanceIsActive(data.PRID)) {
         data.Parent.CommentManager.SendComment({
             PRID: data.PRID,
             PRRepoAccount: data.PRRepoOwner,
             PRRepoName: data.PRRepo
-        }, `You do not have an active preview`)    
+        }, `You do not currently have an active preview.`)    
     } else {
-        await data.Parent.InstanceManager.getInstance(data.PRID).remove()
-        data.Parent.CommentManager.SendComment({
-            PRID: data.PRID,
-            PRRepoAccount: data.PRRepoOwner,
-            PRRepoName: data.PRRepo
-        }, `All done. Thanks for helping me to save resources!`)    
+        await data.Parent.InstanceManager.getInstance(data.PRID).remove(false, () => {
+            data.Parent.CommentManager.SendComment({
+                PRID: data.PRID,
+                PRRepoAccount: data.PRRepoOwner,
+                PRRepoName: data.PRRepo
+            }, `Deleted. Thanks for helping me to save resources!`)    
+        })
     }
 }))
 
@@ -181,12 +211,36 @@ new Command("status", new CommandCallback((data: CommandFunctionData) => {
             PRID: data.PRID,
             PRRepoAccount: data.PRRepoOwner,
             PRRepoName: data.PRRepo
-        }, `You have an active preview!\n\nHere is a link to it: http://${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)    
+        }, `You have an active preview!\n\nHere's a link to it: ${data.Parent.configData.linkToDomain}:${data.Parent.InstanceManager.getInstance(data.PRID).assignedPort}`)    
     } else {
         data.Parent.CommentManager.SendComment({
             PRID: data.PRID,
             PRRepoAccount: data.PRRepoOwner,
             PRRepoName: data.PRRepo
-        }, `You do not have an active preview, but can create one using the \`@${data.Parent.GithubManager.getGithubUsername()} create\` command.`)    
+        }, `You do not have an active preview, but can create one by typing \`@${data.Parent.GithubManager.getGithubUsername()} create\``)    
     }
 }), false)
+
+new Command("_onlyMention", new CommandCallback((data: CommandFunctionData) => {
+   data.Parent.CommentManager.SendComment({
+       PRID: data.PRID,
+       PRRepoAccount: data.PRRepoOwner,
+       PRRepoName: data.PRRepo
+   }, `I am a bot that helps simplify the contribution process by creating and managing preview websites of unfinished and pending contributions.\n\nPlease type \`@${data.Parent.GithubManager.getGithubUsername()} help\` for more information on what you can tell me to do.`) 
+}))
+
+new Command("_invalidCommand", new CommandCallback((data: CommandFunctionData) => {
+    data.Parent.CommentManager.SendComment({
+        PRID: data.PRID,
+        PRRepoAccount: data.PRRepoOwner,
+        PRRepoName: data.PRRepo
+    }, `I couldn't understand what you were trying to tell me to do.\n\nPlease type \`@${data.Parent.GithubManager.getGithubUsername()} help\` for a list of commands I respond to.`)  
+}))
+
+new Command("_noPermission", new CommandCallback((data: CommandFunctionData) => {
+    data.Parent.CommentManager.SendComment({
+        PRID: data.PRID,
+        PRRepoAccount: data.PRRepoOwner,
+        PRRepoName: data.PRRepo
+    }, `Sorry. Only the author of these contributions can run that command. To see what commands you can run, type \`@${data.Parent.GithubManager.getGithubUsername()} help\``)  
+}))

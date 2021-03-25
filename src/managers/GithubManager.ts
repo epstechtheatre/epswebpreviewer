@@ -6,7 +6,7 @@ const Github = require("github-api");
 
 export default class GithubManager {
     Parent: import("../index").Main
-    githubUsername: string | undefined
+    private githubUsername: string | undefined
     gh: any
 
     constructor(Parent: import("../index").Main) {

@@ -39,7 +39,9 @@ export default class CommentManager {
         let commentData: CommentData = (data as CommentData)
         commentData.BotLoginUsername = this.Parent.GithubManager.getGithubUsername()
         commentData.LinkDomain = this.Parent.configData.linkToDomain
-        commentData.AssignedPort = data.PRID
+        
+        //This is safe because this function is only called from instance manager (from inside an active instance)
+        commentData.AssignedPort = this.Parent.InstanceManager.getInstance(data.PRID).assignedPort 
         
         let comment = CommentManager.registeredPrebuiltResponses[commentIdentifier]?.buildMessage(commentData)
 
