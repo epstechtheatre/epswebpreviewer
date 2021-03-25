@@ -1,5 +1,4 @@
 import { PullRequestEvent } from "@octokit/webhooks-definitions/schema";
-import { resolve } from "node:path";
 
 //Manage comments sent out to PR threads
 const Github = require("github-api");
