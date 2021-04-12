@@ -184,11 +184,6 @@ const IC_CB = new bodyTypeCallback((Main: Main, reqBody: IssueCommentEvent) => {
     if (!isValidAction(["created"], reqBody.action)) {
         return //We are not listening to the incoming event
     }
-
-    if (reqBody.issue.pull_request === undefined) {
-        Main.CommandManager.sendNonPRResponse(reqBody)
-        return
-    }
     if (reqBody.issue.state === "closed") {
         return //This is a closed PR
     }
