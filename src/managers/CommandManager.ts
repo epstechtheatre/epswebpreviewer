@@ -34,6 +34,12 @@ export default class CommandManager {
         }
 
         if (commentBody.startsWith(`@${this.Parent.GithubManager.getGithubUsername()}`)) {
+            //Check comment is in PR thread
+            if (ReqBody.issue.pull_request === undefined) {
+                this.sendNonPRResponse(ReqBody);
+                return;
+            }
+
             if (commentBody.trim() === `@${this.Parent.GithubManager.getGithubUsername()}`) {
                 //Comment only mentioned the bot and nothing else
                 CommandManager.Commands["_onlyMention"]?.Command.exec(passData)
